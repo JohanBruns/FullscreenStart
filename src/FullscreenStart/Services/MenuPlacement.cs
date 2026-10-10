@@ -17,6 +17,13 @@ public enum ScreenEdge
 /// <summary>Computes where the menu window goes so that the taskbar stays reachable.</summary>
 public static class MenuPlacement
 {
+    /// <summary>
+    /// A hidden auto-hide taskbar keeps a 2 px sliver on screen; hovering it slides the taskbar in.
+    /// Leaving exactly that sliver free keeps the taskbar reachable without showing a strip of desktop,
+    /// and the menu is not treated as a fullscreen app (which would block the taskbar).
+    /// </summary>
+    public const int AutoHideSliver = 2;
+
     /// <param name="monitor">Full monitor bounds in physical pixels.</param>
     /// <param name="workArea">Monitor work area (already excludes a docked, always-visible taskbar).</param>
     /// <param name="taskbar">Taskbar rectangle as reported by the shell, if known.</param>
@@ -32,9 +39,7 @@ public static class MenuPlacement
             : tb.Top < monitor.Bottom && tb.Bottom > monitor.Top;
         if (!onThisMonitor) return workArea;
 
-        // Leave a strip as thick as the taskbar free so it can still slide in on hover.
-        int thickness = horizontal ? tb.Height : tb.Width;
-        thickness = Math.Clamp(thickness, 0, horizontal ? monitor.Height / 3 : monitor.Width / 3);
+        int thickness = AutoHideSliver;
 
         return edge switch
         {

@@ -52,11 +52,11 @@ public class MenuPlacementTests
     }
 
     [Fact]
-    public void AutoHideTaskbarLeavesItsStripFree()
+    public void AutoHideTaskbarLeavesItsSliverFree()
     {
         // Hidden auto-hide taskbar sits almost completely below the screen edge.
         var result = MenuPlacement.Compute(Monitor, Monitor, new PixelRect(0, 1078, 1920, 1126), ScreenEdge.Bottom, autoHide: true);
-        Assert.Equal(new PixelRect(0, 0, 1920, 1032), result);
+        Assert.Equal(new PixelRect(0, 0, 1920, 1078), result);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class MenuPlacementTests
     public void AutoHideTaskbarOnLeftEdge()
     {
         var result = MenuPlacement.Compute(Monitor, Monitor, new PixelRect(-60, 0, 2, 1080), ScreenEdge.Left, autoHide: true);
-        Assert.Equal(new PixelRect(62, 0, 1920, 1080), result);
+        Assert.Equal(new PixelRect(2, 0, 1920, 1080), result);
     }
 }
 
