@@ -8,7 +8,7 @@ und blendet das Menü nur ein und aus.
 
 | Aktion | Wie |
 | --- | --- |
-| Menü öffnen / schließen | **Windows-Taste**, **Strg+Umschalt+Leertaste**, Klick auf das Tray-Icon, oder `FullscreenStart.exe` erneut starten |
+| Menü öffnen / schließen | **Windows-Taste**, **Start-Knopf der Taskleiste**, **Strg+Umschalt+Leertaste**, Klick auf das Tray-Icon, oder `FullscreenStart.exe` erneut starten |
 | Schließen | Esc, Klick ins Leere, Fokuswechsel, oder automatisch nach dem Starten einer App |
 | Suchen | Einfach lostippen; ↑/↓ wählen, Enter startet den Treffer |
 | App starten | Klick auf Kachel oder Listeneintrag |
@@ -62,6 +62,11 @@ Löscht man `layout.json`, wird es neu erzeugt.
   („Windows-Taste öffnet dieses Menü“) bzw. mit `takeOverWinKey` in `settings.json`.
   Einschränkung: Ist ein Fenster mit Administratorrechten im Vordergrund (z. B. Task-Manager), sieht der Hook
   die Taste nicht (UIPI) und Windows öffnet sein eigenes Startmenü.
+- **Start-Knopf:** Ein Low-Level-Maus-Hook fängt Linksklicks auf den Start-Knopf ab. Windows 11 hält das
+  klassische (unsichtbare) Fenster der Klasse `Start` deckungsgleich über seinem Start-Knopf, daher genügt
+  ein schneller Fenster-Lookup statt UI Automation. Rechtsklick (Win+X-Menü) bleibt unverändert.
+  Abschaltbar im Tray-Menü bzw. mit `takeOverStartButton`. Ändert ein künftiges Windows-Update das, findet
+  der Hook den Knopf nicht mehr und Windows öffnet wieder sein eigenes Startmenü – es geht nichts kaputt.
 - **Design:** Hell/Dunkel und Akzentfarbe kommen von Windows und wechseln live mit
   (`WM_SETTINGCHANGE` „ImmersiveColorSet“, `WM_DWMCOLORIZATIONCOLORCHANGED`). Die Farben liegen in
   `Themes/Colors.Dark.xaml` und `Themes/Colors.Light.xaml`.

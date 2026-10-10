@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.InteropServices;
 using static FullscreenStart.Interop.NativeMethods;
 
@@ -6,8 +5,7 @@ namespace FullscreenStart.Services;
 
 /// <summary>
 /// Low-level keyboard hook that turns a lone press of the Windows key into "open our menu" while
-/// keeping every Win+… shortcut working. Runs on its own thread with its own message loop, so a busy
-/// UI thread never delays typing (Windows drops hooks that answer too slowly).
+/// keeping every Win+… shortcut working.
 /// </summary>
 public sealed class WinKeyHook : IDisposable
 {
@@ -19,57 +17,30 @@ public sealed class WinKeyHook : IDisposable
 
     private readonly Action _onLoneTap;
     private readonly WinKeyFilter _filter = new();
-    private readonly LowLevelKeyboardProc _proc;
-    private Thread? _thread;
-    private uint _threadId;
+    private readonly LowLevelHookProc _proc;
+    private readonly HookThread _thread;
     private volatile bool _resetRequested;
 
     public WinKeyHook(Action onLoneTap)
     {
         _onLoneTap = onLoneTap;
         _proc = HookProc; // keep the delegate alive while the hook exists
+        _thread = new HookThread(WH_KEYBOARD_LL, _proc, "FullscreenStart.WinKeyHook");
     }
 
-    public bool IsInstalled => _thread != null;
+    public bool IsInstalled => _thread.IsInstalled;
 
     public void Install()
     {
-        if (_thread != null) return;
-        var ready = new ManualResetEventSlim();
-        Exception? error = null;
-        _thread = new Thread(() =>
-        {
-            _threadId = GetCurrentThreadId();
-            IntPtr hook = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
-            if (hook == IntPtr.Zero) error = new Win32Exception(Marshal.GetLastWin32Error());
-            ready.Set();
-            if (hook == IntPtr.Zero) return;
-
-            while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
-            {
-                TranslateMessage(ref msg);
-                DispatchMessage(ref msg);
-            }
-            UnhookWindowsHookEx(hook);
-        })
-        { IsBackground = true, Name = "FullscreenStart.WinKeyHook", Priority = ThreadPriority.AboveNormal };
-        _thread.Start();
-        ready.Wait();
-
-        if (error != null)
-        {
-            _thread = null;
-            throw error;
-        }
+        if (IsInstalled) return;
+        _thread.Install();
         Log.Info("Windows key hook installed");
     }
 
     public void Uninstall()
     {
-        if (_thread == null) return;
-        PostThreadMessage(_threadId, WM_QUIT, IntPtr.Zero, IntPtr.Zero);
-        _thread.Join(1000);
-        _thread = null;
+        if (!IsInstalled) return;
+        _thread.Uninstall();
         Log.Info("Windows key hook removed");
     }
 

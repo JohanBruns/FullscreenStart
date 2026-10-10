@@ -10,6 +10,9 @@ public sealed class AppSettings
     /// <summary>A lone press of the Windows key opens this menu instead of the Windows Start menu.</summary>
     public bool TakeOverWinKey { get; set; } = true;
 
+    /// <summary>A left click on the taskbar's Start button opens this menu instead of the Windows Start menu.</summary>
+    public bool TakeOverStartButton { get; set; } = true;
+
     /// <summary>"system" (follow Windows), "light" or "dark".</summary>
     public string Theme { get; set; } = "system";
 

@@ -20,6 +20,7 @@ public partial class App : Application
     private AppCatalog? _catalog;
     private HotkeyManager? _hotkey;
     private WinKeyHook? _winKeyHook;
+    private StartButtonHook? _startButtonHook;
     private TrayIcon? _tray;
     private StartWindow? _window;
 
@@ -79,6 +80,8 @@ public partial class App : Application
         _winKeyHook = new WinKeyHook(() => Dispatcher.BeginInvoke(() => _window.Toggle()));
         bool winKeyOk = settings.TakeOverWinKey && TrySetWinKeyHook(true);
         SystemEvents.SessionSwitch += OnSessionSwitch;
+        _startButtonHook = new StartButtonHook(() => Dispatcher.BeginInvoke(() => _window.Toggle()));
+        bool startButtonOk = settings.TakeOverStartButton && TrySetStartButtonHook(true);
 
         var autostart = Autostart.ForCurrentUser();
         _tray = new TrayIcon($"Fullscreen Start (Windows-Taste oder {settings.Hotkey})", () => _window.Toggle())
@@ -88,6 +91,13 @@ public partial class App : Application
             {
                 bool active = TrySetWinKeyHook(enable);
                 settings.TakeOverWinKey = active;
+                store.SaveSettings(settings);
+                return active;
+            })
+            .AddToggle("Start-Knopf öffnet dieses Menü", startButtonOk, enable =>
+            {
+                bool active = TrySetStartButtonHook(enable);
+                settings.TakeOverStartButton = active;
                 store.SaveSettings(settings);
                 return active;
             })
@@ -124,20 +134,25 @@ public partial class App : Application
         listener.Start();
     }
 
-    /// <summary>Installs or removes the Windows key hook; returns whether it is active afterwards.</summary>
-    private bool TrySetWinKeyHook(bool enable)
+    private bool TrySetWinKeyHook(bool enable) =>
+        _winKeyHook != null && TrySetHook(enable, _winKeyHook.Install, _winKeyHook.Uninstall, () => _winKeyHook.IsInstalled, "Windows key");
+
+    private bool TrySetStartButtonHook(bool enable) =>
+        _startButtonHook != null && TrySetHook(enable, _startButtonHook.Install, _startButtonHook.Uninstall, () => _startButtonHook.IsInstalled, "Start button");
+
+    /// <summary>Installs or removes a hook; returns whether it is active afterwards.</summary>
+    private static bool TrySetHook(bool enable, Action install, Action uninstall, Func<bool> isInstalled, string what)
     {
-        if (_winKeyHook == null) return false;
         try
         {
-            if (enable) _winKeyHook.Install();
-            else _winKeyHook.Uninstall();
+            if (enable) install();
+            else uninstall();
         }
         catch (Exception ex)
         {
-            Log.Error("Windows key hook could not be installed", ex);
+            Log.Error($"{what} hook could not be changed", ex);
         }
-        return _winKeyHook.IsInstalled;
+        return isInstalled();
     }
 
     private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
@@ -212,6 +227,7 @@ public partial class App : Application
     {
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         _winKeyHook?.Dispose();
+        _startButtonHook?.Dispose();
         _hotkey?.Dispose();
         _tray?.Dispose();
         _catalog?.Dispose();
