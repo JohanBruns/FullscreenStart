@@ -10,9 +10,9 @@
         ShowInTaskbar="False"
         ShowActivated="True"
         Topmost="True"
-        Background="#1C1C1C"
+        Background="Transparent"
         FontFamily="{StaticResource UiFont}"
-        Foreground="{StaticResource TextBrush}"
+        Foreground="{DynamicResource TextBrush}"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
@@ -21,7 +21,7 @@
 
         <!-- ===== Tile ===== -->
         <DataTemplate DataType="{x:Type vm:TileViewModel}">
-            <Border x:Name="TileRoot" Tag="tile" Background="{StaticResource TileBrush}" BorderThickness="1" CornerRadius="6"
+            <Border x:Name="TileRoot" Tag="tile" Background="{DynamicResource TileBrush}" BorderThickness="1" CornerRadius="6"
                     BorderBrush="Transparent" RenderTransformOrigin="0.5,0.5"
                     ToolTip="{Binding Name}" ToolTipService.InitialShowDelay="600">
                 <Grid ClipToBounds="True">
@@ -56,8 +56,8 @@
             </Border>
             <DataTemplate.Triggers>
                 <Trigger SourceName="TileRoot" Property="IsMouseOver" Value="True">
-                    <Setter TargetName="TileRoot" Property="Background" Value="{StaticResource TileHoverBrush}" />
-                    <Setter TargetName="TileRoot" Property="BorderBrush" Value="{StaticResource TileHoverBorderBrush}" />
+                    <Setter TargetName="TileRoot" Property="Background" Value="{DynamicResource TileHoverBrush}" />
+                    <Setter TargetName="TileRoot" Property="BorderBrush" Value="{DynamicResource TileHoverBorderBrush}" />
                 </Trigger>
                 <DataTrigger Binding="{Binding IsExpanded}" Value="True">
                     <Setter TargetName="TileRoot" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
@@ -75,7 +75,7 @@
 
         <!-- ===== Open folder ===== -->
         <DataTemplate DataType="{x:Type vm:FolderDrawerViewModel}">
-            <Border Tag="drawer" Background="{StaticResource DrawerBrush}" CornerRadius="6">
+            <Border Tag="drawer" Background="{DynamicResource DrawerBrush}" CornerRadius="6">
                 <StackPanel>
                     <TextBox x:Name="FolderName" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" Style="{StaticResource PlainTextBox}"
                              Background="Transparent" BorderThickness="0" FontSize="15" Height="36" Margin="2,2,2,2" Padding="6,0"
@@ -98,10 +98,10 @@
                     <TextBlock x:Name="HeaderText" Text="{Binding Name}" FontSize="15" VerticalAlignment="Bottom"
                                Margin="0,0,32,11" TextTrimming="CharacterEllipsis" />
                     <TextBlock x:Name="Placeholder" Text="Gruppe benennen" FontSize="15" VerticalAlignment="Bottom"
-                               Margin="0,0,32,11" Foreground="{StaticResource SubtleTextBrush}" Visibility="Collapsed" />
+                               Margin="0,0,32,11" Foreground="{DynamicResource SubtleTextBrush}" Visibility="Collapsed" />
                     <TextBlock x:Name="Grip" Text="&#xE700;" FontFamily="{StaticResource IconFont}" FontSize="14"
                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,4,12"
-                               Foreground="{StaticResource SubtleTextBrush}" Visibility="Collapsed" />
+                               Foreground="{DynamicResource SubtleTextBrush}" Visibility="Collapsed" />
                     <TextBox x:Name="RenameBox" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource PlainTextBox}" BorderThickness="0,0,0,2" FontSize="15" Height="32"
                              VerticalAlignment="Bottom" Margin="0,0,0,4" Visibility="Collapsed"
@@ -150,7 +150,7 @@
 
         <!-- Backdrop: blurred wallpaper + tint + subtle noise (acrylic look) -->
         <Image x:Name="BackdropImage" Stretch="Fill" RenderOptions.BitmapScalingMode="Linear" />
-        <Rectangle x:Name="BackdropTint" Fill="{StaticResource TintBrush}" />
+        <Rectangle x:Name="BackdropTint" Fill="{DynamicResource TintBrush}" />
         <Rectangle x:Name="BackdropNoise" Opacity="0.035" />
 
         <Grid x:Name="Chrome">
@@ -215,7 +215,7 @@
 
                     <!-- Letter index (opens from a group header) -->
                     <Border x:Name="LetterIndex" Width="380" HorizontalAlignment="Left" Margin="30,16,0,0"
-                            Background="#E61C1C1C" Visibility="Collapsed">
+                            Background="{DynamicResource LetterIndexBrush}" Visibility="Collapsed">
                         <ItemsControl ItemsSource="{Binding Letters}" VerticalAlignment="Top" Margin="0,40,0,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -247,7 +247,7 @@
                                    VerticalAlignment="Center" IsHitTestVisible="False" />
                     </Grid>
                     <TextBlock Grid.Row="1" Text="Keine Treffer" Margin="46,24,0,0" FontSize="14"
-                               Foreground="{StaticResource SubtleTextBrush}">
+                               Foreground="{DynamicResource SubtleTextBrush}">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Visibility" Value="Collapsed" />

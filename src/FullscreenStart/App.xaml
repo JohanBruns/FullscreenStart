@@ -5,6 +5,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <!-- Palette first; ThemeColors.Apply swaps it for Colors.Light.xaml at runtime. -->
+                <ResourceDictionary Source="pack://application:,,,/Themes/Colors.Dark.xaml" />
                 <ResourceDictionary Source="Themes/Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

@@ -330,7 +330,7 @@ public partial class StartWindow
             return;
         }
         var accent = (Brush)FindResource("AccentBrush");
-        _indicator.Fill = asBar ? accent : new SolidColorBrush(Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
+        _indicator.Fill = asBar ? accent : (Brush)FindResource("DropTargetFillBrush");
         _indicator.Stroke = asBar ? null : accent;
         _indicator.StrokeThickness = asBar ? 0 : 2;
         _indicator.StrokeDashArray = asBar ? null : new DoubleCollection { 3, 2 };

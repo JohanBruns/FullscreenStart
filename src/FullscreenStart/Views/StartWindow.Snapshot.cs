@@ -44,6 +44,22 @@ public partial class StartWindow
         _vm.SearchText = searchQuery ?? "co";
         await RenderAsync(size, Path.Combine(directory, "search.png"));
         _vm.Reset();
+
+        // The other palette, regardless of the Windows setting. Render once before opening the folder:
+        // in this never-shown window, switching the theme and opening a folder in the same layout pass
+        // leaves the folder with a stale height (the live, shown window is not affected).
+        bool light = ThemeColors.UseLightTheme(_vm.Settings.Theme);
+        ThemeColors.Apply(Application.Current.Resources, !light);
+        string suffix = light ? "dark" : "light";
+        await RenderAsync(size, Path.Combine(directory, $"pinned-{suffix}.png"));
+        if (_vm.Columns.SelectMany(c => c.Groups).SelectMany(g => g.Tiles).FirstOrDefault(t => t.IsFolder) is { } folderTile)
+            _vm.ToggleFolder(folderTile);
+        await RenderAsync(size, Path.Combine(directory, $"folder-open-{suffix}.png"));
+        _vm.CollapseFolders();
+        _vm.View = MenuView.AllApps;
+        await RenderAsync(size, Path.Combine(directory, $"allapps-{suffix}.png"));
+        _vm.Reset();
+        ThemeColors.Apply(Application.Current.Resources, light);
     }
 
     private async Task RenderAsync(Size size, string file)

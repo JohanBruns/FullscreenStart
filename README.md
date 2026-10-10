@@ -38,7 +38,8 @@ gestartete App ebenfalls als Administrator laufen.
 Alles liegt in `%AppData%\FullscreenStart`:
 
 - `layout.json` – Spalten, Gruppen, Kacheln und Ordner
-- `settings.json` – Hotkey, Hintergrund (`backdropBlurRadius`, `backdropTintOpacity`),
+- `settings.json` – Hotkey, Design (`theme`: `system` folgt dem Windows-Modus, sonst `light`/`dark`),
+  Hintergrund (`backdropBlurRadius`, `backdropTintOpacity`),
   Namen auf App-Kacheln (`showTileLabels`, aus = das Icon füllt die ganze Kachel), Startansicht
 - `log.txt` – Start- und Fehlerprotokoll
 
@@ -61,6 +62,9 @@ Löscht man `layout.json`, wird es neu erzeugt.
   („Windows-Taste öffnet dieses Menü“) bzw. mit `takeOverWinKey` in `settings.json`.
   Einschränkung: Ist ein Fenster mit Administratorrechten im Vordergrund (z. B. Task-Manager), sieht der Hook
   die Taste nicht (UIPI) und Windows öffnet sein eigenes Startmenü.
+- **Design:** Hell/Dunkel und Akzentfarbe kommen von Windows und wechseln live mit
+  (`WM_SETTINGCHANGE` „ImmersiveColorSet“, `WM_DWMCOLORIZATIONCOLORCHANGED`). Die Farben liegen in
+  `Themes/Colors.Dark.xaml` und `Themes/Colors.Light.xaml`.
 - **Taskleiste:** Bei automatisch ausgeblendeter Taskleiste bleibt nur ihr 2-px-Rand frei; fährt man mit der Maus
   dorthin, kommt die Taskleiste wie gewohnt heraus.
 

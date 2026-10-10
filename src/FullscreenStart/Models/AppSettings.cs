@@ -10,6 +10,9 @@ public sealed class AppSettings
     /// <summary>A lone press of the Windows key opens this menu instead of the Windows Start menu.</summary>
     public bool TakeOverWinKey { get; set; } = true;
 
+    /// <summary>"system" (follow Windows), "light" or "dark".</summary>
+    public string Theme { get; set; } = "system";
+
     /// <summary>Show the blurred desktop wallpaper behind the menu (falls back to system acrylic).</summary>
     public bool WallpaperBackdrop { get; set; } = true;
 

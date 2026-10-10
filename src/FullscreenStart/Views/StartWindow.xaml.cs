@@ -58,8 +58,7 @@ public partial class StartWindow : Window
         SetWindowLongPtr(_hwnd, GWL_EXSTYLE, new IntPtr(ex));
         SetWindowOpacity(0);
 
-        int dark = 1, square = DWMWCP_DONOTROUND, backdrop = DWMSBT_TRANSIENTWINDOW, noTransitions = 1;
-        DwmSetWindowAttribute(_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+        int square = DWMWCP_DONOTROUND, backdrop = DWMSBT_TRANSIENTWINDOW, noTransitions = 1;
         DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref square, sizeof(int));
         // Windows' own show/hide animation would play on top of ours.
         DwmSetWindowAttribute(_hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, ref noTransitions, sizeof(int));
@@ -68,11 +67,46 @@ public partial class StartWindow : Window
         var margins = new MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
         DwmExtendFrameIntoClientArea(_hwnd, ref margins);
         DwmSetWindowAttribute(_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
-        HwndSource.FromHwnd(_hwnd).CompositionTarget.BackgroundColor = Colors.Transparent;
+        var source = HwndSource.FromHwnd(_hwnd);
+        source.CompositionTarget.BackgroundColor = Colors.Transparent;
+        source.AddHook(WatchThemeChanges);
         Background = Brushes.Transparent;
 
+        ApplyTheme();
         RefreshBackdrop();
         Prewarm();
+    }
+
+    private const int WM_SETTINGCHANGE = 0x001A;
+    private const int WM_DWMCOLORIZATIONCOLORCHANGED = 0x0320;
+    private System.Windows.Threading.DispatcherTimer? _themeTimer;
+
+    /// <summary>Follows Windows when light/dark mode or the accent colour changes.</summary>
+    private IntPtr WatchThemeChanges(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        bool themeChanged = msg == WM_SETTINGCHANGE && lParam != IntPtr.Zero
+                            && System.Runtime.InteropServices.Marshal.PtrToStringUni(lParam) == "ImmersiveColorSet";
+        if (themeChanged || msg == WM_DWMCOLORIZATIONCOLORCHANGED)
+        {
+            // Windows sends several of these in a row, sometimes before the registry is updated: settle first.
+            _themeTimer ??= new System.Windows.Threading.DispatcherTimer(TimeSpan.FromMilliseconds(400),
+                System.Windows.Threading.DispatcherPriority.Background, (_, _) => { _themeTimer!.Stop(); ApplyTheme(); }, Dispatcher);
+            _themeTimer.Stop();
+            _themeTimer.Start();
+        }
+        return IntPtr.Zero;
+    }
+
+    private bool? _appliedLight;
+
+    public void ApplyTheme()
+    {
+        bool light = ThemeColors.UseLightTheme(_vm.Settings.Theme);
+        ThemeColors.Apply(Application.Current.Resources, light);
+        int dark = light ? 0 : 1;
+        if (_hwnd != IntPtr.Zero) DwmSetWindowAttribute(_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+        if (_appliedLight != light) Log.Info($"Theme: {(light ? "light" : "dark")}");
+        _appliedLight = light;
     }
 
     /// <summary>Runs one layout pass while hidden so the first opening does not build all visuals.</summary>

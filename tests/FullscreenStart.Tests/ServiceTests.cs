@@ -209,6 +209,17 @@ public class JsonStoreTests
     }
 }
 
+public class ThemeSettingTests
+{
+    [Theory]
+    [InlineData("light", true)]
+    [InlineData("Hell", true)]
+    [InlineData("dark", false)]
+    [InlineData("DUNKEL", false)]
+    public void ExplicitThemeOverridesWindows(string setting, bool light) =>
+        Assert.Equal(light, ThemeColors.UseLightTheme(setting));
+}
+
 public class HotkeyParsingTests
 {
     [Theory]

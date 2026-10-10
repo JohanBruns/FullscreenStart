@@ -56,7 +56,7 @@ public partial class App : Application
         Log.Initialize(store.Directory);
         HookUnhandledExceptions();
         var settings = store.LoadSettings();
-        Resources["AccentBrush"] = new SolidColorBrush(ThemeColors.Accent());
+        ThemeColors.Apply(Resources, ThemeColors.UseLightTheme(settings.Theme));
 
         _catalog = new AppCatalog(Dispatcher);
         await _catalog.RefreshAsync();
@@ -169,7 +169,7 @@ public partial class App : Application
         try
         {
             var store = new JsonStore();
-            Resources["AccentBrush"] = new SolidColorBrush(ThemeColors.Accent());
+            ThemeColors.Apply(Resources, ThemeColors.UseLightTheme(store.LoadSettings().Theme));
             _catalog = new AppCatalog(Dispatcher);
             await _catalog.RefreshAsync();
             var layout = store.LoadLayout() ?? DefaultLayout.Build(_catalog.Apps.Select(a => (a.Id, a.Name)).ToList());
@@ -189,7 +189,7 @@ public partial class App : Application
         int exitCode = 1;
         try
         {
-            Resources["AccentBrush"] = new SolidColorBrush(ThemeColors.Accent());
+            ThemeColors.Apply(Resources, light: false);
             _catalog = new AppCatalog(Dispatcher);
             await _catalog.RefreshAsync();
 
