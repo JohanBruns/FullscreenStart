@@ -43,6 +43,14 @@ internal static class NativeMethods
     public static extern bool SetForegroundWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
+    public static extern uint GetDpiForWindow(IntPtr hWnd);
+
+    public const int ASFW_ANY = -1;
+
+    [DllImport("user32.dll")]
+    public static extern bool AllowSetForegroundWindow(int processId);
+
+    [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]

@@ -69,6 +69,17 @@ public partial class StartWindow : Window
         Background = Brushes.Transparent;
 
         RefreshBackdrop();
+        Prewarm();
+    }
+
+    /// <summary>Runs one layout pass while hidden so the first opening does not build all visuals.</summary>
+    private void Prewarm()
+    {
+        var bounds = ScreenInfo.MenuBounds();
+        double scale = Math.Max(1, GetDpiForWindow(_hwnd)) / 96.0;
+        var size = new Size(bounds.Width / scale, bounds.Height / scale);
+        RootGrid.Measure(size);
+        RootGrid.Arrange(new Rect(size));
     }
 
     // ---------------------------------------------------------------------------------------
@@ -90,6 +101,8 @@ public partial class StartWindow : Window
             return;
         }
 
+        var opening = Stopwatch.StartNew();
+        LogFirstFrame(opening);
         var bounds = ScreenInfo.MenuBounds();
         SetWindowPos(_hwnd, HWND_TOPMOST, bounds.Left, bounds.Top, bounds.Width, bounds.Height, SWP_NOACTIVATE);
 
@@ -105,6 +118,20 @@ public partial class StartWindow : Window
         Activate();
         SetForegroundWindow(_hwnd);
         Keyboard.Focus(this);
+    }
+
+    private int _openCount;
+
+    /// <summary>Logs how long it took until the first frame was rendered (first opening, or when slow).</summary>
+    private void LogFirstFrame(Stopwatch opening)
+    {
+        int count = ++_openCount;
+        // ContextIdle runs after the layout and render passes of the newly shown window.
+        Dispatcher.BeginInvoke(() =>
+        {
+            long ms = opening.ElapsedMilliseconds;
+            if (count == 1 || ms > 100) Log.Info($"Menu opened (#{count}) in {ms} ms");
+        }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     public void HideMenu()
