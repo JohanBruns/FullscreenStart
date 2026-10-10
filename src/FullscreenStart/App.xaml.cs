@@ -25,6 +25,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        int selfTestArg = Array.IndexOf(e.Args, "--selftest");
+        if (selfTestArg >= 0 && selfTestArg + 1 < e.Args.Length)
+        {
+            await RunSelfTestAsync(e.Args[selfTestArg + 1]);
+            return;
+        }
+
         int snapshotArg = Array.IndexOf(e.Args, "--snapshot");
         if (snapshotArg >= 0 && snapshotArg + 1 < e.Args.Length)
         {
@@ -122,6 +129,31 @@ public partial class App : Application
             File.WriteAllText(Path.Combine(directory, "error.txt"), ex.ToString());
         }
         Shutdown();
+    }
+
+    /// <summary>Developer aid: <c>FullscreenStart.exe --selftest &lt;report file&gt;</c> exercises clicks and drag &amp; drop.</summary>
+    private async Task RunSelfTestAsync(string reportFile)
+    {
+        int exitCode = 1;
+        try
+        {
+            Resources["AccentBrush"] = new SolidColorBrush(ThemeColors.Accent());
+            _catalog = new AppCatalog(Dispatcher);
+            await _catalog.RefreshAsync();
+
+            // Works on the default layout in a throw-away folder; the real layout.json is never touched.
+            var testStore = new JsonStore(Path.Combine(Path.GetTempPath(), "FullscreenStart.SelfTest"));
+            var layout = DefaultLayout.Build(_catalog.Apps.Select(a => (a.Id, a.Name)).ToList());
+            var window = new StartWindow(new MainViewModel(_catalog, testStore, new AppSettings { WallpaperBackdrop = false }, layout));
+            var report = await window.RunSelfTestAsync();
+            File.WriteAllText(reportFile, report);
+            exitCode = report.StartsWith("OK") ? 0 : 1;
+        }
+        catch (Exception ex)
+        {
+            File.WriteAllText(reportFile, "CRASH\n" + ex);
+        }
+        Shutdown(exitCode);
     }
 
     protected override void OnExit(ExitEventArgs e)
