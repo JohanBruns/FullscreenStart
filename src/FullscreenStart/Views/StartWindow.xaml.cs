@@ -86,9 +86,11 @@ public partial class StartWindow : Window
     // Show / hide
     // ---------------------------------------------------------------------------------------
 
+    public IntPtr Handle => _hwnd;
+
     public void Toggle()
     {
-        if (IsVisible) HideMenu();
+        if (IsVisible) HideMenu(restoreFocus: true);
         // A click on the tray icon first deactivates (and hides) the menu; don't reopen it right away.
         else if ((DateTime.Now - _lastHidden).TotalMilliseconds > 300) ShowMenu();
     }
@@ -103,6 +105,8 @@ public partial class StartWindow : Window
 
         var opening = Stopwatch.StartNew();
         LogFirstFrame(opening);
+        var foreground = GetForegroundWindow();
+        _previousForeground = foreground != _hwnd ? foreground : IntPtr.Zero;
         var bounds = ScreenInfo.MenuBounds();
         SetWindowPos(_hwnd, HWND_TOPMOST, bounds.Left, bounds.Top, bounds.Width, bounds.Height, SWP_NOACTIVATE);
 
@@ -116,8 +120,26 @@ public partial class StartWindow : Window
 
         Show();
         Activate();
-        SetForegroundWindow(_hwnd);
+        EnsureForeground();
         Keyboard.Focus(this);
+    }
+
+    /// <summary>
+    /// Windows may refuse to hand the foreground to a background process. Typing into the search and
+    /// closing on focus loss both need it, so fall back to sharing the foreground thread's input state.
+    /// </summary>
+    private void EnsureForeground()
+    {
+        if (SetForegroundWindow(_hwnd) && GetForegroundWindow() == _hwnd) return;
+
+        uint foregroundThread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+        uint ownThread = GetCurrentThreadId();
+        if (foregroundThread != 0 && foregroundThread != ownThread && AttachThreadInput(ownThread, foregroundThread, true))
+        {
+            SetForegroundWindow(_hwnd);
+            AttachThreadInput(ownThread, foregroundThread, false);
+        }
+        if (GetForegroundWindow() != _hwnd) Log.Info("Menu could not take the foreground");
     }
 
     private int _openCount;
@@ -134,7 +156,14 @@ public partial class StartWindow : Window
         }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
-    public void HideMenu()
+    private IntPtr _previousForeground;
+
+    /// <param name="restoreFocus">
+    /// Give the focus back to the window that had it before the menu opened (closing with Esc, the
+    /// hotkey, the Windows key or a click on empty space). Not wanted after launching an app or when
+    /// another window was clicked.
+    /// </param>
+    public void HideMenu(bool restoreFocus = false)
     {
         if (!IsVisible) return;
         try
@@ -148,6 +177,9 @@ public partial class StartWindow : Window
         }
         Hide();
         _lastHidden = DateTime.Now;
+        if (restoreFocus && _previousForeground != IntPtr.Zero && IsWindow(_previousForeground))
+            SetForegroundWindow(_previousForeground);
+        _previousForeground = IntPtr.Zero;
         LetterIndex.Visibility = Visibility.Collapsed;
         _vm.Reset();
     }
@@ -233,7 +265,7 @@ public partial class StartWindow : Window
             else if (LetterIndex.Visibility == Visibility.Visible) LetterIndex.Visibility = Visibility.Collapsed;
             else if (_vm.IsSidebarExpanded) _vm.IsSidebarExpanded = false;
             else if (_vm.Columns.SelectMany(c => c.Groups).Any(g => g.ExpandedFolder != null)) _vm.CollapseFolders();
-            else HideMenu();
+            else HideMenu(restoreFocus: true);
         }
     }
 
@@ -337,7 +369,7 @@ public partial class StartWindow : Window
 
     private void Root_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (_closeOnMouseUp && !e.Handled && !_isDragging) HideMenu();
+        if (_closeOnMouseUp && !e.Handled && !_isDragging) HideMenu(restoreFocus: true);
         _closeOnMouseUp = false;
     }
 

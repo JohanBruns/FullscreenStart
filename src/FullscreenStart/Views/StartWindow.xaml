@@ -4,7 +4,7 @@
         xmlns:vm="clr-namespace:FullscreenStart.ViewModels"
         xmlns:v="clr-namespace:FullscreenStart.Views"
         xmlns:m="clr-namespace:FullscreenStart.Models"
-        Title="Start"
+        Title="Fullscreen Start"
         WindowStyle="None"
         ResizeMode="NoResize"
         ShowInTaskbar="False"

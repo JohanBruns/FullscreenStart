@@ -4,17 +4,19 @@ using static FullscreenStart.Interop.NativeMethods;
 
 namespace FullscreenStart.Services;
 
-/// <summary>Registers one system-wide hotkey on a message-only window.</summary>
+/// <summary>
+/// Registers one system-wide hotkey on an existing window (the hidden menu window). A separate helper
+/// window would be picked up by Windows as the next foreground window whenever the menu hides.
+/// </summary>
 public sealed class HotkeyManager : IDisposable
 {
     private const int HotkeyId = 0x5354; // "ST"
     private readonly HwndSource _source;
     private bool _registered;
 
-    public HotkeyManager()
+    public HotkeyManager(IntPtr hwnd)
     {
-        var parameters = new HwndSourceParameters("FullscreenStart.Hotkey") { ParentWindow = new IntPtr(-3) /* HWND_MESSAGE */ };
-        _source = new HwndSource(parameters);
+        _source = HwndSource.FromHwnd(hwnd) ?? throw new ArgumentException("Not a WPF window handle", nameof(hwnd));
         _source.AddHook(WndProc);
     }
 
@@ -71,6 +73,5 @@ public sealed class HotkeyManager : IDisposable
     {
         Unregister();
         _source.RemoveHook(WndProc);
-        _source.Dispose();
     }
 }
