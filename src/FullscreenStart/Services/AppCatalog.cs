@@ -17,6 +17,9 @@ public sealed class AppCatalog : IDisposable
 {
     public const int IconSize = 96;
 
+    /// <summary>Tile icons fill the tile, so pinned apps get a sharper version.</summary>
+    public const int LargeIconSize = 256;
+
     private readonly StaWorker _sta = new("FullscreenStart.Shell");
     private readonly Dispatcher _dispatcher;
     private Dictionary<string, AppEntry> _byId = new(StringComparer.OrdinalIgnoreCase);
@@ -59,29 +62,38 @@ public sealed class AppCatalog : IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Loads missing icons in the background, the given apps first.</summary>
-    public void LoadIcons(IEnumerable<AppEntry> first)
+    /// <summary>
+    /// Loads missing icons in the background: high-resolution tile icons for the pinned apps first,
+    /// then the regular icons (pinned apps first) for everything else.
+    /// </summary>
+    public void LoadIcons(IReadOnlyCollection<AppEntry> pinned)
     {
         int generation = ++_iconGeneration;
-        var order = first.Concat(Apps).Where(a => a.Icon == null).Distinct().ToList();
-        if (order.Count == 0) return;
+        var large = pinned.Where(a => !a.HasLargeIcon).Distinct().ToList();
+        var small = pinned.Concat(Apps).Where(a => a.Icon == null).Distinct().ToList();
+        if (large.Count == 0 && small.Count == 0) return;
 
         _ = _sta.Run(() =>
         {
             var sw = Stopwatch.StartNew();
+            Load(large, LargeIconSize, (app, icon) => app.LargeIcon = icon);
+            Load(small, IconSize, (app, icon) => app.Icon = icon);
+            using var process = Process.GetCurrentProcess();
+            Log.Info($"Loaded {large.Count} tile and {small.Count} list icons in {sw.ElapsedMilliseconds} ms; private memory {process.PrivateMemorySize64 / 1048576} MB, managed {GC.GetTotalMemory(false) / 1048576} MB");
+        });
+
+        void Load(List<AppEntry> apps, int size, Action<AppEntry, System.Windows.Media.ImageSource> assign)
+        {
             const int batchSize = 16;
             var batch = new List<(AppEntry App, System.Windows.Media.ImageSource Icon)>(batchSize);
-            foreach (var app in order)
+            foreach (var app in apps)
             {
                 if (generation != _iconGeneration) return;
-                if (app.Icon != null) continue;
-                var icon = ShellImaging.LoadIcon(app.Pidl, IconSize);
+                var icon = ShellImaging.LoadIcon(app.Pidl, size);
                 if (icon != null) batch.Add((app, icon));
                 if (batch.Count >= batchSize) Flush();
             }
             Flush();
-            using var process = Process.GetCurrentProcess();
-            Log.Info($"Loaded {order.Count} icons in {sw.ElapsedMilliseconds} ms; private memory {process.PrivateMemorySize64 / 1048576} MB, managed {GC.GetTotalMemory(false) / 1048576} MB");
 
             void Flush()
             {
@@ -90,10 +102,10 @@ public sealed class AppCatalog : IDisposable
                 batch.Clear();
                 _dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
                 {
-                    foreach (var (app, icon) in items) app.Icon = icon;
+                    foreach (var (app, icon) in items) assign(app, icon);
                 });
             }
-        });
+        }
     }
 
     private static List<(string Id, string Name, byte[] Pidl, string? Link)> Enumerate()

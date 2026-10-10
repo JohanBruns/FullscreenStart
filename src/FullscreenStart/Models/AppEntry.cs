@@ -8,6 +8,7 @@ namespace FullscreenStart.Models;
 public sealed class AppEntry : INotifyPropertyChanged
 {
     private ImageSource? _icon;
+    private ImageSource? _largeIcon;
 
     public AppEntry(string id, string name, byte[] pidl, string? linkPath)
     {
@@ -45,8 +46,23 @@ public sealed class AppEntry : INotifyPropertyChanged
             if (ReferenceEquals(_icon, value)) return;
             _icon = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Icon)));
+            if (_largeIcon == null) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LargeIcon)));
         }
     }
+
+    /// <summary>High-resolution icon for big tiles (loaded for pinned apps only); falls back to <see cref="Icon"/>.</summary>
+    public ImageSource? LargeIcon
+    {
+        get => _largeIcon ?? _icon;
+        set
+        {
+            if (ReferenceEquals(_largeIcon, value)) return;
+            _largeIcon = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LargeIcon)));
+        }
+    }
+
+    public bool HasLargeIcon => _largeIcon != null;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

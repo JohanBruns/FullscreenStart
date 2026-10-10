@@ -22,10 +22,11 @@
         <!-- ===== Tile ===== -->
         <DataTemplate DataType="{x:Type vm:TileViewModel}">
             <Border x:Name="TileRoot" Tag="tile" Background="{StaticResource TileBrush}" BorderThickness="1"
-                    BorderBrush="Transparent" RenderTransformOrigin="0.5,0.5">
+                    BorderBrush="Transparent" RenderTransformOrigin="0.5,0.5"
+                    ToolTip="{Binding Name}" ToolTipService.InitialShowDelay="600">
                 <Grid ClipToBounds="True">
-                    <Image x:Name="Icon" Source="{Binding App.Icon}" Width="{Binding IconSize}" Height="{Binding IconSize}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,6"
+                    <Image x:Name="Icon" Source="{Binding App.LargeIcon}" Width="{Binding IconSize}" Height="{Binding IconSize}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0"
                            RenderOptions.BitmapScalingMode="HighQuality"
                            Visibility="{Binding IsApp, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock x:Name="MissingGlyph" Text="&#xE783;" FontFamily="{StaticResource IconFont}" FontSize="24"
@@ -64,6 +65,9 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsMissing}" Value="True">
                     <Setter TargetName="TileRoot" Property="Opacity" Value="0.55" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ShowLabel}" Value="True">
+                    <Setter TargetName="Icon" Property="Margin" Value="0,0,0,6" />
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>

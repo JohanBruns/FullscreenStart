@@ -110,7 +110,9 @@ public sealed class MainViewModel : ObservableObject
     {
         change(Editor);
         _store.SaveLayout(Editor.Layout);
-        if (rebuild) RebuildLayout();
+        if (!rebuild) return;
+        RebuildLayout();
+        LoadPinnedIcons(); // newly pinned apps need their large tile icon
     }
 
     /// <summary>Opens <paramref name="folder"/> (closing any other folder), or closes it if already open.</summary>
@@ -151,9 +153,10 @@ public sealed class MainViewModel : ObservableObject
                 var groupVm = new GroupViewModel(group, columnVm, this);
                 foreach (var tile in group.Tiles)
                 {
-                    var tileVm = new TileViewModel(tile, _catalog.Find(tile.AppId), groupVm, null);
+                    bool labels = Settings.ShowTileLabels;
+                    var tileVm = new TileViewModel(tile, _catalog.Find(tile.AppId), groupVm, null, labels);
                     foreach (var child in tile.Items)
-                        tileVm.Children.Add(new TileViewModel(child, _catalog.Find(child.AppId), groupVm, tileVm));
+                        tileVm.Children.Add(new TileViewModel(child, _catalog.Find(child.AppId), groupVm, tileVm, labels));
                     tileVm.IsExpanded = expanded != null && ReferenceEquals(tile, expanded);
                     groupVm.Tiles.Add(tileVm);
                 }
@@ -170,8 +173,13 @@ public sealed class MainViewModel : ObservableObject
         RebuildLayout();
         RebuildAllApps();
         UpdateSearch();
-        var pinnedApps = Editor.Layout.AllAppTiles.Select(t => _catalog.Find(t.AppId)).OfType<AppEntry>();
-        _catalog.LoadIcons(pinnedApps);
+        LoadPinnedIcons();
+    }
+
+    private void LoadPinnedIcons()
+    {
+        var pinned = Editor.Layout.AllAppTiles.Select(t => _catalog.Find(t.AppId)).OfType<AppEntry>().ToList();
+        _catalog.LoadIcons(pinned);
     }
 
     private void RebuildAllApps()

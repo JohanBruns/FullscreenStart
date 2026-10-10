@@ -24,7 +24,8 @@ und blendet das Menü nur ein und aus.
 Alles liegt in `%AppData%\FullscreenStart`:
 
 - `layout.json` – Spalten, Gruppen, Kacheln und Ordner
-- `settings.json` – Hotkey, Hintergrund (Weichzeichnung, Tönung), Startansicht
+- `settings.json` – Hotkey, Hintergrund (`backdropBlurRadius`, `backdropTintOpacity`),
+  Namen auf App-Kacheln (`showTileLabels`, Standard aus: das Icon füllt die Kachel), Startansicht
 - `log.txt` – Start- und Fehlerprotokoll
 
 Beim ersten Start wird das Layout nach dem alten Windows-10-Startbildschirm angelegt;
