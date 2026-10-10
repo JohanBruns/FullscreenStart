@@ -19,7 +19,7 @@ public partial class StartWindow : Window
     private readonly MainViewModel _vm;
     private readonly StaWorker _backdropWorker = new("FullscreenStart.Backdrop");
     private IntPtr _hwnd;
-    private DateTime _lastHidden = DateTime.MinValue;
+    private DateTime _lastDeactivationHide = DateTime.MinValue;
     private DateTime _lastBackdrop = DateTime.MinValue;
     private bool _backdropPending;
     private bool _closeOnMouseUp;
@@ -43,7 +43,7 @@ public partial class StartWindow : Window
 
         _vm.PropertyChanged += OnViewModelPropertyChanged;
         UpdateNavIndicator();
-        Deactivated += (_, _) => { if (!_isDragging) HideMenu(); };
+        Deactivated += (_, _) => { if (!_isDragging) HideMenu(fromDeactivation: true); };
         InitializeDragDrop();
     }
 
@@ -52,14 +52,17 @@ public partial class StartWindow : Window
     {
         _hwnd = new WindowInteropHelper(this).EnsureHandle();
 
-        // Keep it out of Alt+Tab and the taskbar.
+        // Keep it out of Alt+Tab and the taskbar; layered so the whole window can fade (alpha set per frame).
         long ex = GetWindowLongPtr(_hwnd, GWL_EXSTYLE).ToInt64();
-        ex = (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW;
+        ex = (ex | WS_EX_TOOLWINDOW | WS_EX_LAYERED) & ~WS_EX_APPWINDOW;
         SetWindowLongPtr(_hwnd, GWL_EXSTYLE, new IntPtr(ex));
+        SetWindowOpacity(0);
 
-        int dark = 1, square = DWMWCP_DONOTROUND, backdrop = DWMSBT_TRANSIENTWINDOW;
+        int dark = 1, square = DWMWCP_DONOTROUND, backdrop = DWMSBT_TRANSIENTWINDOW, noTransitions = 1;
         DwmSetWindowAttribute(_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
         DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref square, sizeof(int));
+        // Windows' own show/hide animation would play on top of ours.
+        DwmSetWindowAttribute(_hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, ref noTransitions, sizeof(int));
 
         // System acrylic underneath: visible only when no wallpaper image could be captured.
         var margins = new MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
@@ -88,37 +91,52 @@ public partial class StartWindow : Window
 
     public IntPtr Handle => _hwnd;
 
+    private enum MenuState
+    {
+        Hidden,
+        Opening,
+        Open,
+        Closing,
+    }
+
+    private MenuState _state = MenuState.Hidden;
+
+    private bool IsMenuShown => _state is MenuState.Opening or MenuState.Open;
+
     public void Toggle()
     {
-        if (IsVisible) HideMenu(restoreFocus: true);
+        if (IsMenuShown) HideMenu(restoreFocus: true);
         // A click on the tray icon first deactivates (and hides) the menu; don't reopen it right away.
-        else if ((DateTime.Now - _lastHidden).TotalMilliseconds > 300) ShowMenu();
+        else if ((DateTime.Now - _lastDeactivationHide).TotalMilliseconds > 300) ShowMenu();
     }
 
     public void ShowMenu()
     {
-        if (IsVisible)
+        if (IsMenuShown)
         {
-            Activate();
+            EnsureForeground();
             return;
         }
 
-        var opening = Stopwatch.StartNew();
-        LogFirstFrame(opening);
-        var foreground = GetForegroundWindow();
-        _previousForeground = foreground != _hwnd ? foreground : IntPtr.Zero;
-        var bounds = ScreenInfo.MenuBounds();
-        SetWindowPos(_hwnd, HWND_TOPMOST, bounds.Left, bounds.Top, bounds.Width, bounds.Height, SWP_NOACTIVATE);
+        double startProgress = 0;
+        if (_state == MenuState.Closing)
+        {
+            // Reopened while fading out: turn around from the current opacity.
+            startProgress = MenuMotion.OpeningProgressFor(_windowOpacity);
+        }
+        else
+        {
+            LogFirstFrame(Stopwatch.StartNew());
+            var foreground = GetForegroundWindow();
+            _previousForeground = foreground != _hwnd ? foreground : IntPtr.Zero;
+            var bounds = ScreenInfo.MenuBounds();
+            SetWindowPos(_hwnd, HWND_TOPMOST, bounds.Left, bounds.Top, bounds.Width, bounds.Height, SWP_NOACTIVATE);
+            ApplyFrame(MenuMotion.Opening(0));
+            Show();
+        }
 
-        _vm.Reset();
-        if ((DateTime.Now - _vm.Catalog.LastRefresh).TotalMinutes > 5) _ = _vm.Catalog.RefreshAsync();
-        if ((DateTime.Now - _lastBackdrop).TotalSeconds > 2) RefreshBackdrop();
-
-        PinnedScroll.ScrollToHome();
-        AllAppsList.ScrollIntoView(_vm.AllAppsView?.Cast<object>().FirstOrDefault());
-        PlayOpenAnimation();
-
-        Show();
+        RootGrid.IsHitTestVisible = true;
+        StartAnimation(MenuState.Opening, startProgress);
         Activate();
         EnsureForeground();
         Keyboard.Focus(this);
@@ -163,9 +181,10 @@ public partial class StartWindow : Window
     /// hotkey, the Windows key or a click on empty space). Not wanted after launching an app or when
     /// another window was clicked.
     /// </param>
-    public void HideMenu(bool restoreFocus = false)
+    /// <param name="fromDeactivation">The menu lost focus to another window (e.g. a click on the tray icon).</param>
+    public void HideMenu(bool restoreFocus = false, bool fromDeactivation = false)
     {
-        if (!IsVisible) return;
+        if (!IsMenuShown) return;
         try
         {
             CancelDrag();
@@ -175,22 +194,29 @@ public partial class StartWindow : Window
             // Never let a broken drag keep the menu on screen.
             Log.Error("Cancelling drag failed", ex);
         }
-        Hide();
-        _lastHidden = DateTime.Now;
+        if (fromDeactivation) _lastDeactivationHide = DateTime.Now;
+
+        // Ignore input while fading out; hand the keyboard back right away.
+        RootGrid.IsHitTestVisible = false;
         if (restoreFocus && _previousForeground != IntPtr.Zero && IsWindow(_previousForeground))
             SetForegroundWindow(_previousForeground);
         _previousForeground = IntPtr.Zero;
-        LetterIndex.Visibility = Visibility.Collapsed;
-        _vm.Reset();
+
+        StartAnimation(MenuState.Closing, startProgress: 1 - _windowOpacity);
     }
 
-    private void PlayOpenAnimation()
+    /// <summary>Called once the close animation has finished: hide and prepare the next opening.</summary>
+    private void OnHidden()
     {
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var duration = TimeSpan.FromMilliseconds(160);
-        ContentRoot.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
-        ((TranslateTransform)ContentRoot.RenderTransform).BeginAnimation(TranslateTransform.YProperty,
-            new DoubleAnimation(28, 0, duration) { EasingFunction = ease });
+        Hide();
+        LetterIndex.Visibility = Visibility.Collapsed;
+        _vm.Reset();
+        PinnedScroll.ScrollToHome();
+        AllAppsList.ScrollIntoView(_vm.AllAppsView?.Cast<object>().FirstOrDefault());
+
+        // Slow work happens while the menu is hidden, never during the animation.
+        if ((DateTime.Now - _lastBackdrop).TotalSeconds > 30) RefreshBackdrop();
+        if ((DateTime.Now - _vm.Catalog.LastRefresh).TotalMinutes > 5) _ = _vm.Catalog.RefreshAsync();
     }
 
     private void RefreshBackdrop()
@@ -238,6 +264,11 @@ public partial class StartWindow : Window
     protected override void OnPreviewTextInput(TextCompositionEventArgs e)
     {
         base.OnPreviewTextInput(e);
+        if (!IsMenuShown)
+        {
+            e.Handled = true; // fading out: the keyboard already belongs to the previous window
+            return;
+        }
         if (Keyboard.FocusedElement is TextBox || string.IsNullOrEmpty(e.Text) || char.IsControl(e.Text[0])) return;
 
         // Typing anywhere starts a search, like the Windows start screen.
@@ -250,6 +281,11 @@ public partial class StartWindow : Window
     {
         base.OnPreviewKeyDown(e);
         if (e.Handled) return;
+        if (!IsMenuShown)
+        {
+            e.Handled = true;
+            return;
+        }
 
         if (e.Key == Key.Escape)
         {

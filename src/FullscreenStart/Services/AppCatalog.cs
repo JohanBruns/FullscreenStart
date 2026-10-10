@@ -52,12 +52,17 @@ public sealed class AppCatalog : IDisposable
             byId[id] = entry;
         }
 
-        _byId = byId;
-        Apps = byId.Values
+        var apps = byId.Values
             .OrderBy(a => a.Letter == "#" ? 0 : 1)
             .ThenBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         LastRefresh = DateTime.Now;
+
+        // Rebuilding every tile is expensive; skip it when nothing was installed, removed or renamed.
+        bool changed = apps.Count != Apps.Count || apps.Where((app, i) => !ReferenceEquals(app, Apps[i])).Any();
+        _byId = byId;
+        Apps = apps;
+        if (!changed) return;
         Log.Info($"Catalog: {Apps.Count} apps in {sw.ElapsedMilliseconds} ms");
         Changed?.Invoke(this, EventArgs.Empty);
     }
