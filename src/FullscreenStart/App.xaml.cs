@@ -35,13 +35,17 @@ public partial class App : Application
         _instanceMutex = new Mutex(initiallyOwned: true, InstanceName, out bool isFirst);
         if (!isFirst)
         {
-            // Already running: ask the running instance to open the menu.
+            // Already running: ask the running instance to open the menu (and let it take the foreground).
+            Interop.NativeMethods.AllowSetForegroundWindow(Interop.NativeMethods.ASFW_ANY);
             if (EventWaitHandle.TryOpenExisting(ShowSignalName, out var signal)) signal.Set();
             Shutdown();
             return;
         }
 
+        var startup = Stopwatch.StartNew();
         var store = new JsonStore();
+        Log.Initialize(store.Directory);
+        HookUnhandledExceptions();
         var settings = store.LoadSettings();
         Resources["AccentBrush"] = new SolidColorBrush(ThemeColors.Accent());
 
@@ -70,6 +74,7 @@ public partial class App : Application
             openDataFolder: () => AppLauncher.Open(store.Directory),
             exit: Shutdown);
 
+        Log.Info($"Started in {startup.ElapsedMilliseconds} ms: {_catalog.Apps.Count} apps, hotkey {settings.Hotkey} {(hotkeyOk ? "registered" : "TAKEN")}");
         if (!hotkeyOk)
             _tray.ShowNotice($"Der Hotkey „{settings.Hotkey}“ ist schon belegt. Öffne das Menü über dieses Symbol oder ändere den Hotkey in settings.json.");
 
@@ -81,8 +86,22 @@ public partial class App : Application
         })
         { IsBackground = true, Name = "FullscreenStart.ShowSignal" };
         listener.Start();
+    }
 
-        Debug.WriteLine($"[App] started, {_catalog.Apps.Count} apps");
+    /// <summary>The app lives in the background: log errors instead of crashing out of the tray.</summary>
+    private void HookUnhandledExceptions()
+    {
+        DispatcherUnhandledException += (_, args) =>
+        {
+            Log.Error("Unhandled UI exception", args.Exception);
+            args.Handled = true;
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, args) => Log.Error("Fatal exception", args.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            Log.Error("Unobserved task exception", args.Exception);
+            args.SetObserved();
+        };
     }
 
     /// <summary>Developer aid: <c>FullscreenStart.exe --snapshot &lt;dir&gt; [query]</c> renders the views to PNG and exits.</summary>

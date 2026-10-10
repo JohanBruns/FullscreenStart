@@ -55,7 +55,7 @@ public sealed class AppCatalog : IDisposable
             .ThenBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         LastRefresh = DateTime.Now;
-        Debug.WriteLine($"[Catalog] {Apps.Count} apps in {sw.ElapsedMilliseconds} ms");
+        Log.Info($"Catalog: {Apps.Count} apps in {sw.ElapsedMilliseconds} ms");
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -68,6 +68,7 @@ public sealed class AppCatalog : IDisposable
 
         _ = _sta.Run(() =>
         {
+            var sw = Stopwatch.StartNew();
             const int batchSize = 16;
             var batch = new List<(AppEntry App, System.Windows.Media.ImageSource Icon)>(batchSize);
             foreach (var app in order)
@@ -79,6 +80,8 @@ public sealed class AppCatalog : IDisposable
                 if (batch.Count >= batchSize) Flush();
             }
             Flush();
+            using var process = Process.GetCurrentProcess();
+            Log.Info($"Loaded {order.Count} icons in {sw.ElapsedMilliseconds} ms; private memory {process.PrivateMemorySize64 / 1048576} MB, managed {GC.GetTotalMemory(false) / 1048576} MB");
 
             void Flush()
             {

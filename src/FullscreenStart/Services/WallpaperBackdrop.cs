@@ -18,18 +18,29 @@ public static class WallpaperBackdrop
     /// <summary>Downscale factor before blurring; the image is stretched back up when shown.</summary>
     private const int Scale = 8;
 
+    private static bool _firstCapture = true;
+
     public static BitmapSource? Capture(PixelRect monitor, int blurRadius)
     {
         var sw = Stopwatch.StartNew();
         int w = Math.Max(1, monitor.Width / Scale), h = Math.Max(1, monitor.Height / Scale);
 
-        var pixels = CaptureLiveWallpaper(monitor, w, h) ?? LoadStaticWallpaper(monitor, w, h);
-        if (pixels == null) return null;
+        var live = CaptureLiveWallpaper(monitor, w, h);
+        var pixels = live ?? LoadStaticWallpaper(monitor, w, h);
+        if (pixels == null)
+        {
+            Log.Info("Backdrop: no wallpaper image, using system acrylic");
+            return null;
+        }
 
         ImageBlur.Blur(pixels, w, h, Math.Max(1, blurRadius / Scale / 2), passes: 3);
         var image = BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgr32, null, pixels, w * 4);
         image.Freeze();
-        Debug.WriteLine($"[Backdrop] captured {w}x{h} in {sw.ElapsedMilliseconds} ms");
+        if (_firstCapture)
+        {
+            _firstCapture = false;
+            Log.Info($"Backdrop: {(live != null ? "live wallpaper window" : "static wallpaper")}, {sw.ElapsedMilliseconds} ms");
+        }
         return image;
     }
 
