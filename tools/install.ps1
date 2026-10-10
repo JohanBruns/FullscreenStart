@@ -24,9 +24,18 @@ if ($running) {
 }
 
 Write-Host "Installing to $dest"
-if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
-New-Item -ItemType Directory -Path $dest | Out-Null
-Copy-Item "$staging\*" $dest -Recurse
+# Windows (or a virus scan) can hold the old files for a moment after the process exits: retry.
+for ($attempt = 1; $attempt -le 20; $attempt++) {
+    try {
+        if (Test-Path $dest) { Remove-Item $dest -Recurse -Force -ErrorAction Stop }
+        New-Item -ItemType Directory -Path $dest | Out-Null
+        Copy-Item "$staging\*" $dest -Recurse -ErrorAction Stop
+        break
+    } catch {
+        if ($attempt -eq 20) { throw }
+        Start-Sleep -Milliseconds 500
+    }
+}
 Remove-Item $staging -Recurse -Force
 $exe = Join-Path $dest 'FullscreenStart.exe'
 
