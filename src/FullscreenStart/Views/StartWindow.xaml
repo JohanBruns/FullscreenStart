@@ -22,10 +22,7 @@
         <!-- ===== Tile ===== -->
         <DataTemplate DataType="{x:Type vm:TileViewModel}">
             <Border x:Name="TileRoot" Tag="tile" Background="{StaticResource TileBrush}" BorderThickness="1"
-                    BorderBrush="Transparent" RenderTransformOrigin="0.5,0.5" ToolTipService.InitialShowDelay="900">
-                <Border.RenderTransform>
-                    <ScaleTransform />
-                </Border.RenderTransform>
+                    BorderBrush="Transparent" RenderTransformOrigin="0.5,0.5">
                 <Grid ClipToBounds="True">
                     <Image x:Name="Icon" Source="{Binding App.Icon}" Width="{Binding IconSize}" Height="{Binding IconSize}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,6"

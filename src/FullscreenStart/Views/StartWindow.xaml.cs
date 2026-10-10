@@ -137,7 +137,15 @@ public partial class StartWindow : Window
     public void HideMenu()
     {
         if (!IsVisible) return;
-        CancelDrag();
+        try
+        {
+            CancelDrag();
+        }
+        catch (Exception ex)
+        {
+            // Never let a broken drag keep the menu on screen.
+            Log.Error("Cancelling drag failed", ex);
+        }
         Hide();
         _lastHidden = DateTime.Now;
         LetterIndex.Visibility = Visibility.Collapsed;
@@ -293,7 +301,8 @@ public partial class StartWindow : Window
 
     private void Launch(AppEntry app, bool asAdmin = false)
     {
-        AppLauncher.Launch(app, asAdmin);
+        if (_launchOverride != null) _launchOverride(app);
+        else AppLauncher.Launch(app, asAdmin);
         HideMenu();
     }
 

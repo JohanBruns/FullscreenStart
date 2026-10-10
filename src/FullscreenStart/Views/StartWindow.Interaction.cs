@@ -53,30 +53,45 @@ public partial class StartWindow
         if (FindAncestor<TextBox>(source) != null || FindAncestor<ScrollBar>(source) != null) return;
 
         var element = FindTagged(source, "tile", "groupheader");
-        if (element == null) return;
-        if (element.DataContext is GroupViewModel { IsRenaming: true }) return;
-
-        _pressElement = element;
-        _pressData = element.DataContext;
-        _pressPoint = e.GetPosition(RootGrid);
-        if (_pressData is TileViewModel) SetPressed(element, true);
+        if (element == null || !Press(element, e.GetPosition(RootGrid))) return;
         Mouse.Capture(RootGrid, CaptureMode.SubTree);
         e.Handled = true;
     }
 
     private void Root_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (_pressElement == null) return;
-        var position = e.GetPosition(RootGrid);
-        if (!_isDragging && (position - _pressPoint).Length > DragThreshold) BeginDrag();
-        if (_isDragging) UpdateDrag(position);
+        if (_pressElement != null) MovePress(e.GetPosition(RootGrid));
     }
 
     private void Root_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (_pressElement == null) return;
         e.Handled = true;
+        Release();
+    }
 
+    // Pointer-independent steps of a press, shared by the mouse handlers and the self-test.
+
+    private bool Press(FrameworkElement element, Point position)
+    {
+        if (element.DataContext is GroupViewModel { IsRenaming: true }) return false;
+        _pressElement = element;
+        _pressData = element.DataContext;
+        _pressPoint = position;
+        if (_pressData is TileViewModel) SetPressed(element, true);
+        return true;
+    }
+
+    private void MovePress(Point position)
+    {
+        if (_pressElement == null) return;
+        if (!_isDragging && (position - _pressPoint).Length > DragThreshold) BeginDrag();
+        if (_isDragging) UpdateDrag(position);
+    }
+
+    private void Release()
+    {
+        if (_pressElement == null) return;
         var data = _pressData;
         var element = _pressElement;
         var target = _dropTarget;
@@ -105,8 +120,8 @@ public partial class StartWindow
 
     private static void SetPressed(FrameworkElement element, bool pressed)
     {
-        if (element.RenderTransform is ScaleTransform scale)
-            scale.ScaleX = scale.ScaleY = pressed ? 0.97 : 1.0;
+        // Transforms declared in a template are frozen, so assign a new one instead of changing it.
+        element.RenderTransform = pressed ? new ScaleTransform(0.97, 0.97) : Transform.Identity;
     }
 
     // ---- drag & drop ---------------------------------------------------------------------------
@@ -180,20 +195,24 @@ public partial class StartWindow
 
     private void EndPress()
     {
-        if (_pressElement != null)
-        {
-            SetPressed(_pressElement, false);
-            _pressElement.Opacity = 1;
-        }
+        // Reset the state first: nothing below may leave the menu stuck in a drag.
+        var element = _pressElement;
+        var ghost = _ghost;
         _pressElement = null;
         _pressData = null;
         _dropTarget = null;
         _isDragging = false;
-        _autoScroll.Stop();
-        if (_ghost != null) DragLayer.Children.Remove(_ghost);
         _ghost = null;
+        _autoScroll.Stop();
+
+        if (ghost != null) DragLayer.Children.Remove(ghost);
         _indicator.Visibility = Visibility.Collapsed;
         NewColumnTarget.Visibility = Visibility.Collapsed;
+        if (element != null)
+        {
+            SetPressed(element, false);
+            element.Opacity = 1;
+        }
         if (Mouse.Captured == RootGrid) RootGrid.ReleaseMouseCapture();
     }
 
