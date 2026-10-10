@@ -15,15 +15,19 @@ namespace FullscreenStart.Services;
 /// </summary>
 public static class WallpaperBackdrop
 {
-    /// <summary>Downscale factor before blurring; the image is stretched back up when shown.</summary>
-    private const int Scale = 8;
-
     private static bool _firstCapture = true;
+
+    /// <summary>
+    /// Downscale factor before blurring (the image is stretched back up when shown). Strong blurs can
+    /// work on a small image; light blurs need more pixels or the result looks blotchy.
+    /// </summary>
+    internal static int ScaleFor(int blurRadius) => Math.Clamp(blurRadius / 6, 1, 8);
 
     public static BitmapSource? Capture(PixelRect monitor, int blurRadius)
     {
         var sw = Stopwatch.StartNew();
-        int w = Math.Max(1, monitor.Width / Scale), h = Math.Max(1, monitor.Height / Scale);
+        int scale = ScaleFor(blurRadius);
+        int w = Math.Max(1, monitor.Width / scale), h = Math.Max(1, monitor.Height / scale);
 
         var live = CaptureLiveWallpaper(monitor, w, h);
         var pixels = live ?? LoadStaticWallpaper(monitor, w, h);
@@ -33,7 +37,7 @@ public static class WallpaperBackdrop
             return null;
         }
 
-        ImageBlur.Blur(pixels, w, h, Math.Max(1, blurRadius / Scale / 2), passes: 3);
+        if (blurRadius > 0) ImageBlur.Blur(pixels, w, h, Math.Max(1, blurRadius / scale / 2), passes: 3);
         var image = BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgr32, null, pixels, w * 4);
         image.Freeze();
         if (_firstCapture)

@@ -11,10 +11,10 @@ public sealed class AppSettings
     public bool WallpaperBackdrop { get; set; } = true;
 
     /// <summary>Strength of the tint laid over the backdrop, 0..1.</summary>
-    public double BackdropTintOpacity { get; set; } = 0.66;
+    public double BackdropTintOpacity { get; set; } = 0.6;
 
-    /// <summary>Blur radius in screen pixels.</summary>
-    public int BackdropBlurRadius { get; set; } = 48;
+    /// <summary>Blur radius in screen pixels (0 = sharp). Windows 10 used a light blur.</summary>
+    public int BackdropBlurRadius { get; set; } = 12;
 
     /// <summary>Open in the "Alle Apps" view instead of the pinned tiles.</summary>
     public bool StartInAllApps { get; set; }
