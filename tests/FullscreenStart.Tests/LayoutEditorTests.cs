@@ -168,4 +168,29 @@ public class LayoutEditorTests
 
         Assert.Equal(new[] { "a2", "b1", "a1" }, folder.Items.Select(i => i.AppId));
     }
+
+    [Fact]
+    public void MoveGroupKeepsFreePosition()
+    {
+        var (editor, a, b) = TwoGroups();
+
+        editor.MoveGroup(b, 0, 1, top: 24);
+
+        Assert.Equal(new[] { a, b }, editor.Layout.Columns[0].Groups);
+        Assert.Equal(24, b.Top);
+
+        editor.RemoveSpaceAbove(b);
+        Assert.Equal(0, b.Top);
+    }
+
+    [Fact]
+    public void NewGroupAtFreePositionAboveOthers()
+    {
+        var (editor, a, _) = TwoGroups();
+
+        var group = editor.MoveTileToNewGroup(a.Tiles[0], columnIndex: 1, groupIndex: 0, top: 10);
+
+        Assert.Same(group, editor.Layout.Columns[1].Groups[0]);
+        Assert.Equal(10, group.Top);
+    }
 }

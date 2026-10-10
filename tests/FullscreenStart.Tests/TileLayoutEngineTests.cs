@@ -77,3 +77,42 @@ public class TileLayoutEngineTests
         Assert.Equal(0, TileLayoutEngine.Arrange(Array.Empty<TileSize>()).TotalRows);
     }
 }
+
+public class GroupStackTests
+{
+    [Fact]
+    public void GroupsFlowWithoutPosition()
+    {
+        var tops = GroupStack.Arrange(new[] { (0, 200.0), (0, 100.0), (0, 50.0) });
+
+        Assert.Equal(new[] { 0.0, 200, 300 }, tops);
+    }
+
+    [Fact]
+    public void GroupCanStandFurtherDownWithSpaceAbove()
+    {
+        // Only one group in the column, wanted on the third screen.
+        var tops = GroupStack.Arrange(new[] { (30, 200.0) });
+
+        Assert.Equal(new[] { 30 * GroupStack.RowHeight }, tops);
+    }
+
+    [Fact]
+    public void GroupAboveThatGrowsPushesDownButNeverOverlaps()
+    {
+        var tops = GroupStack.Arrange(new[] { (0, 500.0), (2, 100.0), (0, 100.0) });
+
+        Assert.Equal(new[] { 0.0, 500, 600 }, tops);
+    }
+
+    [Theory]
+    [InlineData(10, 0, 0)]      // right below the group above: no fixed position
+    [InlineData(330, 300, 0)]   // within half a row of where it would land anyway
+    [InlineData(640, 300, 10)]  // clearly further down: snaps to the row
+    [InlineData(-50, 0, 0)]
+    public void RowAtSnapsAndFallsBackToFlow(double y, double flow, int expected)
+    {
+        Assert.Equal(expected, GroupStack.RowAt(y, flow));
+    }
+}
+

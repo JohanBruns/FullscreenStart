@@ -14,9 +14,10 @@ und blendet das Menü nur ein und aus.
 | App starten | Klick auf Kachel oder Listeneintrag |
 | Ordner öffnen | Klick auf eine Ordner-Kachel (klappt unter der Kachel auf) |
 | Kachel verschieben | Ziehen und loslassen – auf eine andere Kachel (Mitte) = Ordner bilden, an den Rand = davor/danach einfügen |
-| Neue Gruppe | Kachel in einen leeren Bereich unter einer Spalte oder rechts neben die letzte Spalte ziehen |
+| Neue Gruppe | Kachel in einen leeren Bereich einer Spalte oder rechts neben die letzte Spalte ziehen – die Gruppe entsteht genau dort |
 | Gruppe umbenennen | Klick auf die Gruppenüberschrift |
-| Gruppe verschieben | Überschrift ziehen |
+| Gruppe verschieben | Überschrift ziehen – auf eine andere Gruppe = davor/danach einreihen, in einen leeren Bereich = frei platzieren (auch weit unten mit Platz darüber; beim Ziehen an den unteren Rand scrollt es weiter) |
+| Lücke über einer Gruppe schließen | Rechtsklick auf die Überschrift → „Nach oben aufrücken“ |
 | Weitere Aktionen | Rechtsklick: anheften/lösen, Größe (klein/mittel/breit/groß), Ordner auflösen, Als Administrator ausführen, Dateispeicherort öffnen |
 
 ## Installation
@@ -37,7 +38,8 @@ gestartete App ebenfalls als Administrator laufen.
 
 Alles liegt in `%AppData%\FullscreenStart`:
 
-- `layout.json` – Spalten, Gruppen, Kacheln und Ordner
+- `layout.json` – Spalten, Gruppen, Kacheln und Ordner; `top` einer Gruppe ist ihre freie Position in
+  Kachelzeilen (64 px) ab Spaltenanfang (fehlt = direkt unter der Gruppe darüber)
 - `settings.json` – Hotkey, Design (`theme`: `system` folgt dem Windows-Modus, sonst `light`/`dark`),
   Hintergrund (`backdropBlurRadius`, `backdropTintOpacity`),
   Namen auf App-Kacheln (`showTileLabels`, aus = das Icon füllt die ganze Kachel), Startansicht

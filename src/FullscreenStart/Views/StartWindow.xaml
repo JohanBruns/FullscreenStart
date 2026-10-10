@@ -180,7 +180,13 @@
                                     <Border Tag="column" Background="Transparent" Margin="0,0,76,0"
                                             MinHeight="{Binding ViewportHeight, ElementName=PinnedScroll}">
                                         <ItemsControl ItemsSource="{Binding Groups}" ItemTemplate="{StaticResource GroupTemplate}"
-                                                      VerticalAlignment="Top" Margin="0,58,0,24" />
+                                                      VerticalAlignment="Top" Margin="0,58,0,24">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <v:GroupColumnPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

@@ -2,6 +2,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using FullscreenStart.Layout;
 using FullscreenStart.Models;
 using FullscreenStart.Services;
 using FullscreenStart.ViewModels;
@@ -128,6 +129,28 @@ public partial class StartWindow
             Expect(column.Groups.IndexOf(sourceGroup.Model) == column.Groups.IndexOf(targetGroup.Model) - 1, "Gruppe steht nicht vor der Zielgruppe");
         });
 
+        await Step("Gruppe weit nach unten ziehen lässt Platz darüber", async () =>
+        {
+            var header = FindDescendants<Grid>(ColumnsHost).First(g => (string?)g.Tag == "groupheader");
+            var group = (GroupViewModel)header.DataContext;
+            var model = group.Model;
+            await DragFarDown(header, size);
+            Expect(model.Top > 0, "Gruppe hat keine freie Position bekommen");
+            var column = _vm.Editor.Layout.Columns.First(c => c.Groups.Contains(model));
+            Expect(column.Groups.Last() == model, "Gruppe steht nicht als letzte in ihrer Spalte");
+            ExpectAtRow(model);
+        });
+
+        await Step("Kachel weit nach unten ziehen erzeugt Gruppe an dieser Stelle", async () =>
+        {
+            var app = Tile(t => t.App != null && t.ParentFolder == null);
+            string name = Vm(app).Name;
+            await DragFarDown(app, size);
+            var created = _vm.Editor.Layout.AllGroups.First(g => g.Tiles.Any(t => t.Name == name));
+            Expect(created.Top > 0 && created.Tiles.Count == 1, $"{name} steht nicht in einer neuen, frei platzierten Gruppe");
+            ExpectAtRow(created);
+        });
+
         await Step("Abbrechen eines Drags hinterlässt keinen Zustand", async () =>
         {
             var app = Tile(t => t.App != null);
@@ -168,6 +191,30 @@ public partial class StartWindow
         MovePress(target);
         Release();
         await LayoutForTest(size);
+    }
+
+    /// <summary>Drags into the first column, into the extra empty page that a drag adds below everything.</summary>
+    private async Task DragFarDown(FrameworkElement element, Size size)
+    {
+        var start = Center(element);
+        Press(element, start);
+        MovePress(start + new Vector(DragThreshold + 4, 0));
+        await LayoutForTest(size);
+        var column = FindDescendants<Border>(ColumnsHost).First(b => (string?)b.Tag == "column");
+        var r = BoundsOf(column);
+        Expect(r.Height > size.Height * 1.5, "Beim Ziehen entsteht unten kein zusätzlicher Platz");
+        MovePress(new Point(r.Left + 150, r.Bottom - 200));
+        Release();
+        await LayoutForTest(size);
+    }
+
+    /// <summary>Checks that a group is drawn at its free position.</summary>
+    private void ExpectAtRow(TileGroup model)
+    {
+        var header = FindDescendants<Grid>(ColumnsHost).First(g => (string?)g.Tag == "groupheader" && ((GroupViewModel)g.DataContext).Model == model);
+        var panel = FindAncestor<GroupColumnPanel>(header) ?? throw new InvalidOperationException("Kein Spalten-Panel");
+        double y = header.TranslatePoint(new Point(), panel).Y;
+        Expect(Math.Abs(y - model.Top * GroupStack.RowHeight) < 1, $"Gruppe steht bei {y:0} statt {model.Top * GroupStack.RowHeight:0}");
     }
 
     private async Task LayoutForTest(Size size)

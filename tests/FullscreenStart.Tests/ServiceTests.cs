@@ -165,6 +165,7 @@ public class JsonStoreTests
                             new TileGroup
                             {
                                 Name = "Spiele & Tools",
+                                Top = 12,
                                 Tiles = { Tile.ForApp("steam", "Steam", TileSize.Wide), Tile.ForFolder("Ordner", new[] { Tile.ForApp("a", "A") }) },
                             },
                         },
@@ -183,6 +184,7 @@ public class JsonStoreTests
             Assert.Empty(tiles[0].Items);
             Assert.Equal(TileKind.Folder, tiles[1].Kind);
             Assert.Equal("a", tiles[1].Items[0].AppId);
+            Assert.Equal(12, loaded.Columns[0].Groups[0].Top);
         }
         finally
         {

@@ -101,11 +101,14 @@ public sealed class LayoutEditor(StartLayout layout)
         Layout.Normalize();
     }
 
-    /// <summary>Moves a tile into a new, unnamed group placed in the given column (a new column if out of range).</summary>
-    public TileGroup MoveTileToNewGroup(Tile tile, int columnIndex, int groupIndex)
+    /// <summary>
+    /// Moves a tile into a new, unnamed group placed in the given column (a new column if out of range),
+    /// optionally at a free position (<see cref="TileGroup.Top"/>).
+    /// </summary>
+    public TileGroup MoveTileToNewGroup(Tile tile, int columnIndex, int groupIndex, int top = 0)
     {
         Detach(tile);
-        var group = new TileGroup { Tiles = { tile } };
+        var group = new TileGroup { Tiles = { tile }, Top = Math.Max(0, top) };
         InsertGroup(group, columnIndex, groupIndex);
         Layout.Normalize();
         return group;
@@ -148,7 +151,8 @@ public sealed class LayoutEditor(StartLayout layout)
         Layout.Normalize();
     }
 
-    public void MoveGroup(TileGroup group, int columnIndex, int groupIndex)
+    /// <summary>Moves a group to an index in a column and gives it a new position (<see cref="TileGroup.Top"/>).</summary>
+    public void MoveGroup(TileGroup group, int columnIndex, int groupIndex, int top = 0)
     {
         var source = Layout.Columns.FirstOrDefault(c => c.Groups.Contains(group));
         if (source == null) return;
@@ -158,9 +162,13 @@ public sealed class LayoutEditor(StartLayout layout)
 
         // Keep the source column alive while inserting so that column indexes stay valid.
         source.Groups.Remove(group);
+        group.Top = Math.Max(0, top);
         InsertGroup(group, columnIndex, groupIndex);
         Layout.Normalize();
     }
+
+    /// <summary>Lets a group close up to the group above it again.</summary>
+    public void RemoveSpaceAbove(TileGroup group) => group.Top = 0;
 
     /// <summary>Finds the group holding a tile and, if it sits in a folder, that folder.</summary>
     public (TileGroup? Group, Tile? Folder) Locate(Tile tile)

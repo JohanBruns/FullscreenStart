@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using FullscreenStart.Layout;
 using FullscreenStart.Models;
 using FullscreenStart.Services;
 using FullscreenStart.ViewModels;
@@ -21,8 +22,14 @@ public partial class StartWindow
     private sealed record InsertTile(GroupViewModel Group, int Index) : DropTarget;
     private sealed record InsertInFolder(TileViewModel Folder, int Index) : DropTarget;
     private sealed record MergeWith(TileViewModel Tile) : DropTarget;
-    private sealed record NewGroup(int Column) : DropTarget;
-    private sealed record InsertGroup(int Column, int Index) : DropTarget;
+    private sealed record NewGroup(int Column, int Index, int Top) : DropTarget;
+    private sealed record InsertGroup(int Column, int Index, int Top) : DropTarget;
+
+    /// <summary>Height of a group header: a tile dropped into free space lands this far below the group's top.</summary>
+    private const double GroupHeaderHeight = 44;
+
+    /// <summary>Top margin of the groups in a column (matches StartWindow.xaml).</summary>
+    private const double ColumnContentTop = 58;
 
     private FrameworkElement? _pressElement;
     private object? _pressData;
@@ -149,6 +156,8 @@ public partial class StartWindow
         if (_pressData is TileViewModel { IsFolder: true, IsExpanded: true }) _vm.CollapseFolders();
 
         NewColumnTarget.Visibility = Visibility.Visible;
+        // One empty page below everything, so a group can be placed further down; AutoScroll adds more.
+        ColumnsHost.MinHeight = PinnedScroll.ExtentHeight + PinnedScroll.ViewportHeight;
         _autoScroll.Start();
     }
 
@@ -177,14 +186,14 @@ public partial class StartWindow
                 case MergeWith m: _vm.Edit(e => e.MergeIntoFolder(model, m.Tile.Model)); break;
                 case NewGroup n:
                     TileGroup? created = null;
-                    _vm.Edit(e => created = e.MoveTileToNewGroup(model, n.Column, int.MaxValue));
+                    _vm.Edit(e => created = e.MoveTileToNewGroup(model, n.Column, n.Index, n.Top));
                     if (created != null) StartRename(created);
                     break;
             }
         }
         else if (data is GroupViewModel group && target is InsertGroup g)
         {
-            _vm.Edit(e => e.MoveGroup(group.Model, g.Column, g.Index));
+            _vm.Edit(e => e.MoveGroup(group.Model, g.Column, g.Index, g.Top));
         }
     }
 
@@ -208,6 +217,7 @@ public partial class StartWindow
         if (ghost != null) DragLayer.Children.Remove(ghost);
         _indicator.Visibility = Visibility.Collapsed;
         NewColumnTarget.Visibility = Visibility.Collapsed;
+        ColumnsHost.ClearValue(MinHeightProperty);
         if (element != null)
         {
             SetPressed(element, false);
@@ -275,12 +285,14 @@ public partial class StartWindow
             case ("groupheader" or "group", GroupViewModel group):
                 indicator = BoundsOf(FindTagged(element, "group") ?? element);
                 return new InsertTile(group, int.MaxValue);
-            case ("column", ColumnViewModel column):
-                indicator = NewGroupSlot(element);
-                return new NewGroup(column.Index);
+            case ("column", ColumnViewModel):
             case ("newcolumn", _):
-                indicator = new Rect(bounds.X, bounds.Y + 44, TileGroupPanel.GroupWidth, 124);
-                return new NewGroup(_vm.Columns.Count);
+            {
+                // The new group's header goes above the dragged tile, wherever it is dropped.
+                var slot = FreeSlot(element, GhostTop(position) - GroupHeaderHeight, null);
+                indicator = new Rect(slot.Indicator.X, slot.Indicator.Y + 2 + GroupHeaderHeight, TileGroupPanel.GroupWidth, 124);
+                return new NewGroup(slot.Column, slot.Index, slot.Top);
+            }
         }
         return null;
     }
@@ -294,32 +306,65 @@ public partial class StartWindow
 
         switch (element.Tag, element.DataContext)
         {
-            case ("group", GroupViewModel target):
+            case ("group", GroupViewModel target) when !ReferenceEquals(target, dragged):
             {
-                if (ReferenceEquals(target, dragged)) return null;
+                // Before a group: take its place (and its position); after it: follow right below it.
                 bool before = position.Y < bounds.Top + bounds.Height / 2;
                 indicator = new Rect(bounds.X, before ? bounds.Top - 2 : bounds.Bottom - 12, bounds.Width, 4);
-                return new InsertGroup(target.Column.Index, target.Column.Groups.IndexOf(target) + (before ? 0 : 1));
+                return new InsertGroup(target.Column.Index, target.Column.Groups.IndexOf(target) + (before ? 0 : 1),
+                    before ? target.Model.Top : 0);
             }
-            case ("column", ColumnViewModel column):
-            {
-                var slot = NewGroupSlot(element);
-                indicator = new Rect(slot.X, slot.Y, slot.Width, 4);
-                return new InsertGroup(column.Index, int.MaxValue);
-            }
+            case ("group", GroupViewModel):
+            case ("column", ColumnViewModel):
             case ("newcolumn", _):
-                indicator = new Rect(bounds.X, bounds.Y + 20, TileGroupPanel.GroupWidth, 4);
-                return new InsertGroup(_vm.Columns.Count, 0);
+            {
+                // Free space (or the group's own spot): the group goes where its header is dropped.
+                var column = element.Tag is "group" ? FindTagged(element, "column") : element;
+                if (column == null) return null;
+                var slot = FreeSlot(column, GhostTop(position), dragged);
+                indicator = slot.Indicator;
+                return new InsertGroup(slot.Column, slot.Index, slot.Top);
+            }
         }
         return null;
     }
 
-    /// <summary>Area below the last group of a column, where a new group would appear.</summary>
-    private Rect NewGroupSlot(FrameworkElement column)
+    private double GhostTop(Point position) => position.Y - _grabOffset.Y;
+
+    private sealed record Slot(int Column, int Index, int Top, Rect Indicator);
+
+    /// <summary>
+    /// Where a group whose top edge is dropped at <paramref name="y"/> ends up in a column (or in the
+    /// new-column area): its index among the column's groups, its free position and a marker line.
+    /// </summary>
+    private Slot FreeSlot(FrameworkElement columnElement, double y, GroupViewModel? dragged)
     {
-        var bounds = BoundsOf(column);
-        double used = (column as Border)?.Child is FrameworkElement content ? content.ActualHeight : 0;
-        return new Rect(bounds.X, bounds.Y + used + 44, TileGroupPanel.GroupWidth, 124);
+        var bounds = BoundsOf(columnElement);
+        if (columnElement.DataContext is not ColumnViewModel column || (columnElement as Border)?.Child is not ItemsControl groups)
+        {
+            // Empty area right of the last column: a new column.
+            double origin = bounds.Y + ColumnContentTop;
+            int newTop = GroupStack.RowAt(y - origin, 0);
+            return new Slot(_vm.Columns.Count, 0, newTop,
+                new Rect(bounds.X, origin + newTop * GroupStack.RowHeight - 2, TileGroupPanel.GroupWidth, 4));
+        }
+
+        double panelTop = BoundsOf(groups).Y;
+        double local = y - panelTop;
+        int index = 0;
+        double flow = 0;
+        foreach (var group in column.Groups)
+        {
+            if (groups.ItemContainerGenerator.ContainerFromItem(group) is not FrameworkElement container) continue;
+            var r = BoundsOf(container);
+            if (r.Top - panelTop >= local) break;
+            index++;
+            if (!ReferenceEquals(group, dragged)) flow = r.Bottom - panelTop;
+        }
+
+        int top = GroupStack.RowAt(local, flow);
+        double at = panelTop + Math.Max(flow, top * GroupStack.RowHeight);
+        return new Slot(column.Index, index, top, new Rect(bounds.X, at - 2, TileGroupPanel.GroupWidth, 4));
     }
 
     private void ShowIndicator(Rect? rect, bool asBar)
@@ -350,6 +395,9 @@ public partial class StartWindow
         double dx = p.X > PinnedScroll.ActualWidth - edge ? step : p.X < edge ? -step : 0;
         double dy = p.Y > PinnedScroll.ActualHeight - edge ? step : p.Y < edge ? -step : 0;
         if (dx == 0 && dy == 0) return;
+        // Held at the bottom edge: keep adding empty space, so a group can go as far down as wanted.
+        if (dy > 0 && PinnedScroll.VerticalOffset >= PinnedScroll.ScrollableHeight - 1)
+            ColumnsHost.MinHeight = Math.Max(ColumnsHost.MinHeight, PinnedScroll.ExtentHeight) + step;
         PinnedScroll.ScrollToHorizontalOffset(PinnedScroll.HorizontalOffset + dx);
         PinnedScroll.ScrollToVerticalOffset(PinnedScroll.VerticalOffset + dy);
         UpdateDrag(_lastDragPoint);
@@ -514,6 +562,8 @@ public partial class StartWindow
     {
         var menu = new ContextMenu();
         menu.Items.Add(CreateItem("Gruppe umbenennen", "", () => StartRename(group)));
+        if (group.Model.Top > 0)
+            menu.Items.Add(CreateItem("Nach oben aufrücken", "", () => _vm.Edit(e => e.RemoveSpaceAbove(group.Model))));
         menu.Items.Add(CreateItem("Gruppe von Start lösen", "", () => _vm.Edit(e => e.DeleteGroup(group.Model))));
         return menu;
     }

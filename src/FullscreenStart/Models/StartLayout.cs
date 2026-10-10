@@ -64,6 +64,15 @@ public sealed class LayoutColumn
 public sealed class TileGroup
 {
     public string Name { get; set; } = "";
+
+    /// <summary>
+    /// Where the group wants to sit, in tile rows (64 px) from the top of its column; 0 = right below the
+    /// group above. Lets a group stand further down with empty space above it. Groups above that grow
+    /// push it down, but never up past this position.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int Top { get; set; }
+
     public List<Tile> Tiles { get; set; } = new();
 }
 
