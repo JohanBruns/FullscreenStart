@@ -16,8 +16,8 @@ public sealed class AppSettings
     /// <summary>Blur radius in screen pixels (0 = sharp). Windows 10 used a light blur.</summary>
     public int BackdropBlurRadius { get; set; } = 12;
 
-    /// <summary>Show app names on tiles. Off: the icon fills the tile and the name is a tooltip.</summary>
-    public bool ShowTileLabels { get; set; }
+    /// <summary>Show app names on tiles (bottom left). Off: the icon fills the whole tile.</summary>
+    public bool ShowTileLabels { get; set; } = true;
 
     /// <summary>Open in the "Alle Apps" view instead of the pinned tiles.</summary>
     public bool StartInAllApps { get; set; }

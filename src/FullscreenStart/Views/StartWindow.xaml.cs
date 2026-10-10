@@ -386,8 +386,8 @@ public partial class StartWindow : Window
         _vm.IsSidebarExpanded = false;
     }
 
-    private void Documents_Click(object sender, RoutedEventArgs e) =>
-        OpenAndHide(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+    // Downloads has no Environment.SpecialFolder entry; the shell alias resolves even if the folder was moved.
+    private void Downloads_Click(object sender, RoutedEventArgs e) => OpenAndHide("shell:Downloads");
 
     private void Pictures_Click(object sender, RoutedEventArgs e) =>
         OpenAndHide(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));

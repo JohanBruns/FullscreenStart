@@ -334,6 +334,7 @@ public partial class StartWindow
         _indicator.Stroke = asBar ? null : accent;
         _indicator.StrokeThickness = asBar ? 0 : 2;
         _indicator.StrokeDashArray = asBar ? null : new DoubleCollection { 3, 2 };
+        _indicator.RadiusX = _indicator.RadiusY = asBar ? 2 : 6;
         _indicator.Width = r.Width;
         _indicator.Height = r.Height;
         Canvas.SetLeft(_indicator, r.X);
@@ -366,7 +367,7 @@ public partial class StartWindow
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
         {
-            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x66, 0x40, 0x40, 0x40)), null, new Rect(element.RenderSize));
+            dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(0x66, 0x40, 0x40, 0x40)), null, new Rect(element.RenderSize), 6, 6);
             dc.DrawRectangle(new VisualBrush(element), null, new Rect(element.RenderSize));
         }
         bitmap.Render(visual);

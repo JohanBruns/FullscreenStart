@@ -21,7 +21,7 @@
 
         <!-- ===== Tile ===== -->
         <DataTemplate DataType="{x:Type vm:TileViewModel}">
-            <Border x:Name="TileRoot" Tag="tile" Background="{StaticResource TileBrush}" BorderThickness="1"
+            <Border x:Name="TileRoot" Tag="tile" Background="{StaticResource TileBrush}" BorderThickness="1" CornerRadius="6"
                     BorderBrush="Transparent" RenderTransformOrigin="0.5,0.5"
                     ToolTip="{Binding Name}" ToolTipService.InitialShowDelay="600">
                 <Grid ClipToBounds="True">
@@ -67,14 +67,15 @@
                     <Setter TargetName="TileRoot" Property="Opacity" Value="0.55" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding ShowLabel}" Value="True">
-                    <Setter TargetName="Icon" Property="Margin" Value="0,0,0,6" />
+                    <!-- Keep the icon clear of the name at the bottom. -->
+                    <Setter TargetName="Icon" Property="Margin" Value="0,0,0,14" />
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
 
         <!-- ===== Open folder ===== -->
         <DataTemplate DataType="{x:Type vm:FolderDrawerViewModel}">
-            <Border Tag="drawer" Background="{StaticResource DrawerBrush}">
+            <Border Tag="drawer" Background="{StaticResource DrawerBrush}" CornerRadius="6">
                 <StackPanel>
                     <TextBox x:Name="FolderName" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" Style="{StaticResource PlainTextBox}"
                              Background="Transparent" BorderThickness="0" FontSize="15" Height="36" Margin="2,2,2,2" Padding="6,0"
@@ -303,10 +304,10 @@
                                 <TextBlock x:Name="UserNameText" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource NavButton}" Click="Documents_Click" ToolTip="Dokumente">
+                        <Button Style="{StaticResource NavButton}" Click="Downloads_Click" ToolTip="Downloads">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE8A5;" FontFamily="{StaticResource IconFont}" FontSize="16" Width="48" TextAlignment="Center" />
-                                <TextBlock Text="Dokumente" VerticalAlignment="Center" />
+                                <TextBlock Text="&#xE896;" FontFamily="{StaticResource IconFont}" FontSize="16" Width="48" TextAlignment="Center" />
+                                <TextBlock Text="Downloads" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource NavButton}" Click="Pictures_Click" ToolTip="Bilder">

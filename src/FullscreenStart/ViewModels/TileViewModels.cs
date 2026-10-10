@@ -40,8 +40,8 @@ public sealed class TileViewModel : ObservableObject
 
     public double IconSize => (ShowLabel, Size) switch
     {
-        (true, TileSize.Large) => 72,
-        (true, _) => 40,
+        (true, TileSize.Large) => 150,
+        (true, _) => 68,
         (false, TileSize.Small) => 44,
         (false, TileSize.Large) => 188,
         _ => 92,
