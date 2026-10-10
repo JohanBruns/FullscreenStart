@@ -80,20 +80,35 @@ public partial class App : Application
         bool winKeyOk = settings.TakeOverWinKey && TrySetWinKeyHook(true);
         SystemEvents.SessionSwitch += OnSessionSwitch;
 
-        _tray = new TrayIcon(
-            settings.Hotkey,
-            toggleMenu: () => _window.Toggle(),
-            refreshApps: () => _ = _catalog.RefreshAsync(),
-            openDataFolder: () => AppLauncher.Open(store.Directory),
-            exit: Shutdown,
-            winKeyEnabled: winKeyOk,
-            setWinKey: enable =>
+        var autostart = Autostart.ForCurrentUser();
+        _tray = new TrayIcon($"Fullscreen Start (Windows-Taste oder {settings.Hotkey})", () => _window.Toggle())
+            .AddItem("Startmenü öffnen", () => _window.Toggle())
+            .AddSeparator()
+            .AddToggle("Windows-Taste öffnet dieses Menü", winKeyOk, enable =>
             {
                 bool active = TrySetWinKeyHook(enable);
                 settings.TakeOverWinKey = active;
                 store.SaveSettings(settings);
                 return active;
-            });
+            })
+            .AddToggle("Mit Windows starten", autostart.IsEnabled, enable =>
+            {
+                try
+                {
+                    if (enable) autostart.Enable(Environment.ProcessPath!);
+                    else autostart.Disable();
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+                {
+                    Log.Error("Autostart could not be changed", ex);
+                }
+                return autostart.IsEnabled;
+            })
+            .AddSeparator()
+            .AddItem("Apps neu einlesen", () => _ = _catalog.RefreshAsync())
+            .AddItem("Einstellungsordner öffnen", () => AppLauncher.Open(store.Directory))
+            .AddSeparator()
+            .AddItem("Beenden", Shutdown);
 
         Log.Info($"Started in {startup.ElapsedMilliseconds} ms: {_catalog.Apps.Count} apps, hotkey {settings.Hotkey} {(hotkeyOk ? "registered" : "TAKEN")}");
         if (!hotkeyOk)

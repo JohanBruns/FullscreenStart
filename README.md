@@ -19,6 +19,20 @@ und blendet das Menü nur ein und aus.
 | Gruppe verschieben | Überschrift ziehen |
 | Weitere Aktionen | Rechtsklick: anheften/lösen, Größe (klein/mittel/breit/groß), Ordner auflösen, Als Administrator ausführen, Dateispeicherort öffnen |
 
+## Installation
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools/install.ps1
+```
+
+Installiert nach `%LocalAppData%\Programs\FullscreenStart` (ersetzt eine laufende Version), legt den
+Startmenü-Eintrag „Fullscreen Start“ an und schaltet „Mit Windows starten“ ein (`-NoAutostart` lässt das weg).
+Autostart und Windows-Taste lassen sich jederzeit im Tray-Menü umschalten.
+`tools/uninstall.ps1` entfernt alles wieder; Layout und Einstellungen bleiben, außer mit `-RemoveData`.
+
+Der Autostart läuft bewusst mit normalen Rechten: Mit Administratorrechten würde jede aus dem Menü
+gestartete App ebenfalls als Administrator laufen.
+
 ## Daten
 
 Alles liegt in `%AppData%\FullscreenStart`:
