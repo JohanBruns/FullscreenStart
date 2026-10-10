@@ -8,7 +8,7 @@ und blendet das Menü nur ein und aus.
 
 | Aktion | Wie |
 | --- | --- |
-| Menü öffnen / schließen | **Strg+Umschalt+Leertaste**, Klick auf das Tray-Icon, oder `FullscreenStart.exe` erneut starten |
+| Menü öffnen / schließen | **Windows-Taste**, **Strg+Umschalt+Leertaste**, Klick auf das Tray-Icon, oder `FullscreenStart.exe` erneut starten |
 | Schließen | Esc, Klick ins Leere, Fokuswechsel, oder automatisch nach dem Starten einer App |
 | Suchen | Einfach lostippen; ↑/↓ wählen, Enter startet den Treffer |
 | App starten | Klick auf Kachel oder Listeneintrag |
@@ -41,6 +41,12 @@ Löscht man `layout.json`, wird es neu erzeugt.
   Live-Wallpaper (z. B. Lively) werden per `PrintWindow` aus ihrem Fenster hinter den Desktop-Symbolen
   gelesen, sonst wird das normale Hintergrundbild geladen; danach verkleinert, weichgezeichnet und getönt.
   Klappt beides nicht, bleibt das Acrylic von Windows sichtbar.
+- **Windows-Taste:** Ein Low-Level-Tastatur-Hook (eigener Thread) erkennt einen einzelnen Druck auf Win.
+  Vor dem Loslassen wird eine unbelegte Taste (VK 0xE8) eingeschoben, damit Windows sein Startmenü nicht öffnet;
+  Win+E, Win+R, Win+Umschalt+S usw. laufen unverändert durch. Abschaltbar im Tray-Menü
+  („Windows-Taste öffnet dieses Menü“) bzw. mit `takeOverWinKey` in `settings.json`.
+  Einschränkung: Ist ein Fenster mit Administratorrechten im Vordergrund (z. B. Task-Manager), sieht der Hook
+  die Taste nicht (UIPI) und Windows öffnet sein eigenes Startmenü.
 - **Taskleiste:** Bei automatisch ausgeblendeter Taskleiste bleibt nur ihr 2-px-Rand frei; fährt man mit der Maus
   dorthin, kommt die Taskleiste wie gewohnt heraus.
 

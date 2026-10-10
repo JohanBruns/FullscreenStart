@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using Microsoft.Win32;
 using FullscreenStart.Models;
 using FullscreenStart.Services;
 using FullscreenStart.ViewModels;
@@ -18,6 +19,7 @@ public partial class App : Application
     private EventWaitHandle? _showSignal;
     private AppCatalog? _catalog;
     private HotkeyManager? _hotkey;
+    private WinKeyHook? _winKeyHook;
     private TrayIcon? _tray;
     private StartWindow? _window;
 
@@ -70,16 +72,28 @@ public partial class App : Application
         _window = new StartWindow(viewModel);
         _window.Initialize();
 
-        _hotkey = new HotkeyManager();
+        _hotkey = new HotkeyManager(_window.Handle);
         _hotkey.Pressed += (_, _) => _window.Toggle();
         bool hotkeyOk = _hotkey.Register(settings.Hotkey);
+
+        _winKeyHook = new WinKeyHook(() => Dispatcher.BeginInvoke(() => _window.Toggle()));
+        bool winKeyOk = settings.TakeOverWinKey && TrySetWinKeyHook(true);
+        SystemEvents.SessionSwitch += OnSessionSwitch;
 
         _tray = new TrayIcon(
             settings.Hotkey,
             toggleMenu: () => _window.Toggle(),
             refreshApps: () => _ = _catalog.RefreshAsync(),
             openDataFolder: () => AppLauncher.Open(store.Directory),
-            exit: Shutdown);
+            exit: Shutdown,
+            winKeyEnabled: winKeyOk,
+            setWinKey: enable =>
+            {
+                bool active = TrySetWinKeyHook(enable);
+                settings.TakeOverWinKey = active;
+                store.SaveSettings(settings);
+                return active;
+            });
 
         Log.Info($"Started in {startup.ElapsedMilliseconds} ms: {_catalog.Apps.Count} apps, hotkey {settings.Hotkey} {(hotkeyOk ? "registered" : "TAKEN")}");
         if (!hotkeyOk)
@@ -93,6 +107,29 @@ public partial class App : Application
         })
         { IsBackground = true, Name = "FullscreenStart.ShowSignal" };
         listener.Start();
+    }
+
+    /// <summary>Installs or removes the Windows key hook; returns whether it is active afterwards.</summary>
+    private bool TrySetWinKeyHook(bool enable)
+    {
+        if (_winKeyHook == null) return false;
+        try
+        {
+            if (enable) _winKeyHook.Install();
+            else _winKeyHook.Uninstall();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Windows key hook could not be installed", ex);
+        }
+        return _winKeyHook.IsInstalled;
+    }
+
+    private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
+    {
+        // Win+L locks before the Win key-up reaches the hook.
+        if (e.Reason is SessionSwitchReason.SessionUnlock or SessionSwitchReason.ConsoleConnect)
+            _winKeyHook?.RequestReset();
     }
 
     /// <summary>The app lives in the background: log errors instead of crashing out of the tray.</summary>
@@ -158,6 +195,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        SystemEvents.SessionSwitch -= OnSessionSwitch;
+        _winKeyHook?.Dispose();
         _hotkey?.Dispose();
         _tray?.Dispose();
         _catalog?.Dispose();

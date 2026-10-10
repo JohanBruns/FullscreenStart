@@ -8,11 +8,15 @@ public sealed class TrayIcon : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
 
-    public TrayIcon(string hotkey, Action toggleMenu, Action refreshApps, Action openDataFolder, Action exit)
+    public TrayIcon(string hotkey, Action toggleMenu, Action refreshApps, Action openDataFolder, Action exit,
+        bool winKeyEnabled, Func<bool, bool> setWinKey)
     {
         var stream = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/app.ico"))!.Stream;
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Startmenü öffnen", null, (_, _) => toggleMenu());
+        var winKey = new Forms.ToolStripMenuItem("Windows-Taste öffnet dieses Menü") { Checked = winKeyEnabled };
+        winKey.Click += (_, _) => winKey.Checked = setWinKey(!winKey.Checked);
+        menu.Items.Add(winKey);
         menu.Items.Add("Apps neu einlesen", null, (_, _) => refreshApps());
         menu.Items.Add("Einstellungsordner öffnen", null, (_, _) => openDataFolder());
         menu.Items.Add(new Forms.ToolStripSeparator());

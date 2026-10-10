@@ -7,6 +7,9 @@ public sealed class AppSettings
     /// <summary>Global hotkey, e.g. "Ctrl+Shift+Space".</summary>
     public string Hotkey { get; set; } = "Ctrl+Shift+Space";
 
+    /// <summary>A lone press of the Windows key opens this menu instead of the Windows Start menu.</summary>
+    public bool TakeOverWinKey { get; set; } = true;
+
     /// <summary>Show the blurred desktop wallpaper behind the menu (falls back to system acrylic).</summary>
     public bool WallpaperBackdrop { get; set; } = true;
 
