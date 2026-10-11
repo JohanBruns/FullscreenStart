@@ -47,16 +47,33 @@ $link.WorkingDirectory = $dest
 $link.Description = 'Vollbild-Startmenue'
 $link.Save()
 
-$run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+# Autostart of earlier versions (Run key). From a terminal inside a packaged (MSIX) app that write went to
+# the package's private registry and never took effect; the task below is registered for real.
+Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name FullscreenStart -ErrorAction SilentlyContinue
+Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run' `
+    -Name FullscreenStart -ErrorAction SilentlyContinue
+
 if ($NoAutostart) {
-    Remove-ItemProperty -Path $run -Name FullscreenStart -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName FullscreenStart -Confirm:$false -ErrorAction SilentlyContinue
 } else {
-    Set-ItemProperty -Path $run -Name FullscreenStart -Value "`"$exe`" --autostart"
-    # Windows 11 skips Run entries without an "enabled" mark here (this also replaces a Task Manager "disabled").
-    $approved = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'
-    if (-not (Test-Path $approved)) { New-Item -Path $approved -Force | Out-Null }
-    Set-ItemProperty -Path $approved -Name FullscreenStart -Type Binary -Value ([byte[]](2,0,0,0,0,0,0,0,0,0,0,0))
+    # Same task as the tray menu's "Mit Windows starten": at this user's sign-in, normal rights and priority.
+    $user = "$env:USERDOMAIN\$env:USERNAME"
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
+    $trigger.Delay = 'PT3S'
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -Priority 4
+    Register-ScheduledTask -TaskName FullscreenStart -Force `
+        -Description 'Startet Fullscreen Start bei der Anmeldung.' `
+        -Action (New-ScheduledTaskAction -Execute $exe -Argument '--autostart' -WorkingDirectory $dest) `
+        -Trigger $trigger -Settings $settings `
+        -Principal (New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited) | Out-Null
 }
 
-Start-Process $exe
+if ($NoAutostart) {
+    Start-Process $exe
+} else {
+    # Started by the Task Scheduler, the menu runs outside any app container this script may run in, so it
+    # uses the real %AppData% (layout, settings) just like after the next sign-in.
+    Start-ScheduledTask -TaskName FullscreenStart
+}
 Write-Host "Done. Autostart: $(-not $NoAutostart)"

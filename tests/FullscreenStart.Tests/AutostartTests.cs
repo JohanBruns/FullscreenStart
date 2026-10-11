@@ -1,13 +1,18 @@
+using System.Xml.Linq;
 using FullscreenStart.Services;
 using Microsoft.Win32;
 
 namespace FullscreenStart.Tests;
 
-/// <summary>Runs against a throw-away key under HKCU\Software, never the real Run key.</summary>
+/// <summary>Runs against a fake task store and a throw-away key under HKCU\Software, never the real ones.</summary>
 public sealed class AutostartTests : IDisposable
 {
+    private const string RunPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string ApprovedPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+
     private readonly string _path = @"Software\FullscreenStart.Tests\" + Guid.NewGuid();
     private readonly RegistryKey _root;
+    private readonly FakeTaskStore _tasks = new();
 
     public AutostartTests() => _root = Registry.CurrentUser.CreateSubKey(_path);
 
@@ -20,7 +25,7 @@ public sealed class AutostartTests : IDisposable
     [Fact]
     public void EnableAndDisable()
     {
-        var autostart = new Autostart(_root);
+        var autostart = new Autostart(_tasks, _root);
         Assert.False(autostart.IsEnabled);
 
         autostart.Enable(@"C:\Apps\Fullscreen Start\FullscreenStart.exe");
@@ -33,51 +38,71 @@ public sealed class AutostartTests : IDisposable
     }
 
     [Fact]
-    public void TaskManagerDisableIsRespectedAndClearedOnEnable()
+    public void OldRunEntryBecomesTask()
     {
-        var autostart = new Autostart(_root);
-        autostart.Enable(@"C:\x.exe");
-        using (var approved = _root.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"))
-            approved.SetValue(Autostart.ValueName, new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, RegistryValueKind.Binary);
+        SetRunEntry(approved: null);
+        var autostart = new Autostart(_tasks, _root);
+
+        Assert.True(autostart.MigrateRunEntry(@"C:\x.exe"));
+
+        Assert.True(autostart.IsEnabled);
+        Assert.Null(_root.OpenSubKey(RunPath)?.GetValue(Autostart.TaskName));
+        Assert.Null(_root.OpenSubKey(ApprovedPath)?.GetValue(Autostart.TaskName));
+        Assert.False(autostart.MigrateRunEntry(@"C:\x.exe")); // nothing left to convert
+    }
+
+    [Fact]
+    public void RunEntrySwitchedOffInTaskManagerStaysOff()
+    {
+        SetRunEntry(approved: new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+        var autostart = new Autostart(_tasks, _root);
+
+        Assert.True(autostart.MigrateRunEntry(@"C:\x.exe"));
 
         Assert.False(autostart.IsEnabled);
-
-        autostart.Enable(@"C:\x.exe");
-        Assert.True(autostart.IsEnabled);
+        Assert.Null(_root.OpenSubKey(RunPath)?.GetValue(Autostart.TaskName));
     }
 
     [Fact]
-    public void EnableWritesAnExplicitEnabledMark()
+    public void TaskStartsAtSignInWithNormalRightsAndPriority()
     {
-        var autostart = new Autostart(_root);
-        autostart.Enable(@"C:\x.exe");
+        var xml = XDocument.Parse(Autostart.TaskXml(@"C:\A B\x.exe", @"PC\Johan"));
+        XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+        string Value(string name) => xml.Descendants(ns + name).Single().Value;
 
-        using var approved = _root.OpenSubKey(ApprovedPath);
-        var flags = Assert.IsType<byte[]>(approved?.GetValue(Autostart.ValueName));
-        Assert.Equal(2, flags[0]);
+        Assert.Equal(@"PC\Johan", xml.Descendants(ns + "LogonTrigger").Single().Element(ns + "UserId")!.Value);
+        Assert.Equal("LeastPrivilege", Value("RunLevel"));
+        Assert.Equal("InteractiveToken", Value("LogonType"));
+        Assert.Equal("4", Value("Priority"));
+        Assert.Equal("PT0S", Value("ExecutionTimeLimit"));
+        Assert.Equal("false", Value("DisallowStartIfOnBatteries"));
+        Assert.Equal(@"C:\A B\x.exe", Value("Command"));
+        Assert.Equal("--autostart", Value("Arguments"));
+        Assert.Equal(@"C:\A B", Value("WorkingDirectory"));
     }
 
-    [Fact]
-    public void EnsureApprovedRepairsMissingMarkButKeepsDisabled()
+    private void SetRunEntry(byte[]? approved)
     {
-        var autostart = new Autostart(_root);
-        Assert.False(autostart.EnsureApproved()); // no Run entry: nothing to do
-
-        using (var run = _root.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
-            run.SetValue(Autostart.ValueName, Autostart.CommandFor(@"C:\x.exe"));
-        Assert.True(autostart.EnsureApproved());
-        Assert.False(autostart.EnsureApproved());
-        Assert.True(autostart.IsEnabled);
-
-        using (var approved = _root.CreateSubKey(ApprovedPath))
-            approved.SetValue(Autostart.ValueName, new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, RegistryValueKind.Binary);
-        Assert.False(autostart.EnsureApproved());
-        Assert.False(autostart.IsEnabled);
+        using (var run = _root.CreateSubKey(RunPath))
+            run.SetValue(Autostart.TaskName, "\"C:\\x.exe\" --autostart");
+        if (approved == null) return;
+        using var key = _root.CreateSubKey(ApprovedPath);
+        key.SetValue(Autostart.TaskName, approved, RegistryValueKind.Binary);
     }
 
-    private const string ApprovedPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+    private sealed class FakeTaskStore : ILogonTaskStore
+    {
+        private readonly Dictionary<string, string> _tasks = new();
 
-    [Fact]
-    public void CommandQuotesThePath() =>
-        Assert.Equal("\"C:\\A B\\x.exe\" --autostart", Autostart.CommandFor(@"C:\A B\x.exe"));
+        public bool IsEnabled(string name) => _tasks.ContainsKey(name);
+
+        public string? CommandOf(string name) =>
+            _tasks.TryGetValue(name, out var xml)
+                ? XDocument.Parse(xml).Descendants().First(e => e.Name.LocalName == "Command").Value
+                : null;
+
+        public void Register(string name, string xml) => _tasks[name] = xml;
+
+        public void Delete(string name) => _tasks.Remove(name);
+    }
 }

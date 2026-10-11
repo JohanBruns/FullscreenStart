@@ -84,13 +84,26 @@ public partial class App : Application
         bool startButtonOk = settings.TakeOverStartButton && TrySetStartButtonHook(true);
 
         var autostart = Autostart.ForCurrentUser();
+        // Registry and Task Scheduler (COM) can fail in many ways; autostart is never worth a crash.
+        bool AutostartOn()
+        {
+            try
+            {
+                return autostart.IsEnabled;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Autostart state could not be read", ex);
+                return false;
+            }
+        }
         try
         {
-            if (autostart.EnsureApproved()) Log.Info("Autostart entry marked as enabled for Windows");
+            if (autostart.MigrateRunEntry(Environment.ProcessPath!)) Log.Info("Autostart moved from the Run key to a sign-in task");
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        catch (Exception ex)
         {
-            Log.Error("Autostart entry could not be checked", ex);
+            Log.Error("Autostart entry could not be converted", ex);
         }
         _tray = new TrayIcon($"Fullscreen Start (Windows-Taste oder {settings.Hotkey})", () => _window.Toggle())
             .AddItem("Startmenü öffnen", () => _window.Toggle())
@@ -109,18 +122,18 @@ public partial class App : Application
                 store.SaveSettings(settings);
                 return active;
             })
-            .AddToggle("Mit Windows starten", autostart.IsEnabled, enable =>
+            .AddToggle("Mit Windows starten", AutostartOn(), enable =>
             {
                 try
                 {
                     if (enable) autostart.Enable(Environment.ProcessPath!);
                     else autostart.Disable();
                 }
-                catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+                catch (Exception ex)
                 {
                     Log.Error("Autostart could not be changed", ex);
                 }
-                return autostart.IsEnabled;
+                return AutostartOn();
             })
             .AddSeparator()
             .AddItem("Apps neu einlesen", () => _ = _catalog.RefreshAsync())
