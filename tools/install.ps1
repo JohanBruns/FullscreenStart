@@ -52,8 +52,10 @@ if ($NoAutostart) {
     Remove-ItemProperty -Path $run -Name FullscreenStart -ErrorAction SilentlyContinue
 } else {
     Set-ItemProperty -Path $run -Name FullscreenStart -Value "`"$exe`" --autostart"
-    Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run' `
-        -Name FullscreenStart -ErrorAction SilentlyContinue
+    # Windows 11 skips Run entries without an "enabled" mark here (this also replaces a Task Manager "disabled").
+    $approved = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'
+    if (-not (Test-Path $approved)) { New-Item -Path $approved -Force | Out-Null }
+    Set-ItemProperty -Path $approved -Name FullscreenStart -Type Binary -Value ([byte[]](2,0,0,0,0,0,0,0,0,0,0,0))
 }
 
 Start-Process $exe

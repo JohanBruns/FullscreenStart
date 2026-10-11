@@ -47,6 +47,37 @@ public sealed class AutostartTests : IDisposable
     }
 
     [Fact]
+    public void EnableWritesAnExplicitEnabledMark()
+    {
+        var autostart = new Autostart(_root);
+        autostart.Enable(@"C:\x.exe");
+
+        using var approved = _root.OpenSubKey(ApprovedPath);
+        var flags = Assert.IsType<byte[]>(approved?.GetValue(Autostart.ValueName));
+        Assert.Equal(2, flags[0]);
+    }
+
+    [Fact]
+    public void EnsureApprovedRepairsMissingMarkButKeepsDisabled()
+    {
+        var autostart = new Autostart(_root);
+        Assert.False(autostart.EnsureApproved()); // no Run entry: nothing to do
+
+        using (var run = _root.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
+            run.SetValue(Autostart.ValueName, Autostart.CommandFor(@"C:\x.exe"));
+        Assert.True(autostart.EnsureApproved());
+        Assert.False(autostart.EnsureApproved());
+        Assert.True(autostart.IsEnabled);
+
+        using (var approved = _root.CreateSubKey(ApprovedPath))
+            approved.SetValue(Autostart.ValueName, new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, RegistryValueKind.Binary);
+        Assert.False(autostart.EnsureApproved());
+        Assert.False(autostart.IsEnabled);
+    }
+
+    private const string ApprovedPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+
+    [Fact]
     public void CommandQuotesThePath() =>
         Assert.Equal("\"C:\\A B\\x.exe\" --autostart", Autostart.CommandFor(@"C:\A B\x.exe"));
 }

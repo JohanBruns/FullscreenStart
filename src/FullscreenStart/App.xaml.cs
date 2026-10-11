@@ -84,6 +84,14 @@ public partial class App : Application
         bool startButtonOk = settings.TakeOverStartButton && TrySetStartButtonHook(true);
 
         var autostart = Autostart.ForCurrentUser();
+        try
+        {
+            if (autostart.EnsureApproved()) Log.Info("Autostart entry marked as enabled for Windows");
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            Log.Error("Autostart entry could not be checked", ex);
+        }
         _tray = new TrayIcon($"Fullscreen Start (Windows-Taste oder {settings.Hotkey})", () => _window.Toggle())
             .AddItem("Startmenü öffnen", () => _window.Toggle())
             .AddSeparator()
